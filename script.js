@@ -1,6 +1,7 @@
 /* =====================================================
    Pizarra Táctica · Kayak Polo
-   Motor de la pizarra + interfaz
+   Motor de la pizarra + interfaz (mouse, táctil y lápiz)
+   Vista: zoom con pinch/rueda + pan con 2 dedos
    ===================================================== */
 
 /* ================= CANVAS ================= */
@@ -20,6 +21,36 @@ let seleccionado = null;
 let offsetX = 0;
 let offsetY = 0;
 let dibujando = false;
+
+/* ================= VISTA (zoom y desplazamiento) ================= */
+
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3;
+const vista = { zoom: 1, x: 0, y: 0 };
+let vistaObjetivo = null; // destino animado (recuadrar)
+let pellizco = null;     // estado del gesto de 2 dedos
+const punteros = new Map(); // punteros activos sobre el canvas
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// de coordenadas de pantalla a coordenadas del campo
+function aMundo(sx, sy) {
+  return { x: (sx - vista.x) / vista.zoom, y: (sy - vista.y) / vista.zoom };
+}
+
+// zoom manteniendo fijo el punto (sx, sy)
+function zoomEn(sx, sy, factor) {
+  const zoom = clamp(vista.zoom * factor, ZOOM_MIN, ZOOM_MAX);
+  const w = aMundo(sx, sy);
+  vista.zoom = zoom;
+  vista.x = sx - w.x * zoom;
+  vista.y = sy - w.y * zoom;
+  vistaObjetivo = null;
+}
+
+function recuadrar() {
+  vistaObjetivo = { zoom: 1, x: 0, y: 0 };
+}
 
 /* ================= IMÁGENES ================= */
 
@@ -50,9 +81,12 @@ let trazoActual = [];
 /* ================= INTERFAZ ================= */
 
 const botonesModo = document.querySelectorAll(".tool");
+const btnRecuadrar = document.getElementById("btn-recuadrar");
 const btnLimpiar = document.getElementById("btn-limpiar");
 const btnGuardar = document.getElementById("btn-guardar");
 const statusTexto = document.getElementById("status-texto");
+
+const TOQUE = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
 
 const AYUDAS = {
   mover: "Mover — arrastra los botes y la pelota",
@@ -61,24 +95,29 @@ const AYUDAS = {
   lapiz: "Lápiz — dibuja sobre el campo"
 };
 
+function ayudaModo(m) {
+  return AYUDAS[m] + (TOQUE ? " · 2 dedos: zoom y mover" : "");
+}
+
 function avisar(mensaje) {
   statusTexto.textContent = mensaje;
   clearTimeout(avisar.t);
   avisar.t = setTimeout(() => {
-    statusTexto.textContent = AYUDAS[modo];
+    statusTexto.textContent = ayudaModo(modo);
   }, 2000);
 }
 
 function setModo(m) {
   modo = m;
   botonesModo.forEach(b => b.classList.toggle("is-active", b.dataset.modo === m));
-  statusTexto.textContent = AYUDAS[m];
+  statusTexto.textContent = ayudaModo(m);
   canvas.className = "cur-" + m;
 }
 
 botonesModo.forEach(b =>
   b.addEventListener("click", () => setModo(b.dataset.modo))
 );
+btnRecuadrar.addEventListener("click", recuadrar);
 btnLimpiar.addEventListener("click", limpiar);
 btnGuardar.addEventListener("click", guardar);
 
@@ -103,6 +142,7 @@ window.addEventListener("keydown", e => {
     case "r": case "2": setModo("rotar"); break;
     case "e": case "3": setModo("escalar"); break;
     case "p": case "4": setModo("lapiz"); break;
+    case "0": recuadrar(); break;
   }
 });
 
@@ -120,8 +160,8 @@ function anillo(x, y, radio) {
   ctx.beginPath();
   ctx.arc(x, y, radio, 0, Math.PI * 2);
   ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
-  ctx.lineWidth = 2.5;
-  ctx.setLineDash([7, 6]);
+  ctx.lineWidth = 2.5 / vista.zoom;
+  ctx.setLineDash([7 / vista.zoom, 6 / vista.zoom]);
   ctx.stroke();
   ctx.setLineDash([]);
 }
@@ -145,7 +185,7 @@ function dibujarPelota() {
   ctx.arc(pelota.x, pelota.y, pelota.r, 0, Math.PI * 2);
   ctx.fillStyle = "white";
   ctx.fill();
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2 / vista.zoom;
   ctx.strokeStyle = "rgba(15, 23, 42, 0.75)";
   ctx.stroke();
 
@@ -165,7 +205,24 @@ function dibujarTrazos() {
 }
 
 function loop() {
+  // animación suave al recuadrar
+  if (vistaObjetivo) {
+    vista.zoom += (vistaObjetivo.zoom - vista.zoom) * 0.25;
+    vista.x += (vistaObjetivo.x - vista.x) * 0.25;
+    vista.y += (vistaObjetivo.y - vista.y) * 0.25;
+    if (
+      Math.abs(vista.zoom - vistaObjetivo.zoom) < 0.002 &&
+      Math.abs(vista.x - vistaObjetivo.x) < 0.5 &&
+      Math.abs(vista.y - vistaObjetivo.y) < 0.5
+    ) {
+      Object.assign(vista, vistaObjetivo);
+      vistaObjetivo = null;
+    }
+  }
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(vista.zoom, 0, 0, vista.zoom, vista.x, vista.y);
   dibujarFondo();
   dibujarBotes();
   dibujarPelota();
@@ -189,24 +246,44 @@ const imagenLista = () => {
 canvas.addEventListener("pointerdown", e => {
   const mx = e.offsetX;
   const my = e.offsetY;
+  punteros.set(e.pointerId, { x: mx, y: my });
+  canvas.setPointerCapture(e.pointerId);
+
+  // segundo dedo: empieza zoom/pan con 2 dedos
+  if (punteros.size === 2) {
+    soltar();
+    vistaObjetivo = null;
+    const [a, b] = [...punteros.values()];
+    pellizco = {
+      dist: Math.max(10, Math.hypot(b.x - a.x, b.y - a.y)),
+      mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+      zoom: vista.zoom,
+      x: vista.x,
+      y: vista.y
+    };
+    return;
+  }
+  if (punteros.size > 2) return;
+
+  const w = aMundo(mx, my);
+  const toque = e.pointerType === "touch";
+  const margen = toque ? 14 : 4; // targets más generosos con el dedo
 
   // pelota
-  if (Math.hypot(mx - pelota.x, my - pelota.y) < pelota.r + 6) {
+  if (Math.hypot(w.x - pelota.x, w.y - pelota.y) < pelota.r + 6 + margen) {
     seleccionado = pelota;
-    offsetX = mx - pelota.x;
-    offsetY = my - pelota.y;
-    canvas.setPointerCapture(e.pointerId);
+    offsetX = w.x - pelota.x;
+    offsetY = w.y - pelota.y;
     return;
   }
 
   // botes (el de arriba primero)
   for (let i = botes.length - 1; i >= 0; i--) {
     const b = botes[i];
-    if (Math.hypot(mx - b.x, my - b.y) < (TAM / 2) * b.scale + 4) {
+    if (Math.hypot(w.x - b.x, w.y - b.y) < (TAM / 2) * b.scale + margen) {
       seleccionado = b;
-      offsetX = mx - b.x;
-      offsetY = my - b.y;
-      canvas.setPointerCapture(e.pointerId);
+      offsetX = w.x - b.x;
+      offsetY = w.y - b.y;
       return;
     }
   }
@@ -214,42 +291,83 @@ canvas.addEventListener("pointerdown", e => {
   // lápiz
   if (modo === "lapiz") {
     dibujando = true;
-    trazoActual = [{ x: mx, y: my }];
+    trazoActual = [{ x: w.x, y: w.y }];
     trazos.push(trazoActual);
-    canvas.setPointerCapture(e.pointerId);
   }
 });
 
 canvas.addEventListener("pointermove", e => {
   const mx = e.offsetX;
   const my = e.offsetY;
+  if (punteros.has(e.pointerId)) punteros.set(e.pointerId, { x: mx, y: my });
+
+  // zoom/pan con 2 dedos
+  if (pellizco && punteros.size >= 2) {
+    const [a, b] = [...punteros.values()];
+    const dist = Math.max(10, Math.hypot(b.x - a.x, b.y - a.y));
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const zoom = clamp(pellizco.zoom * (dist / pellizco.dist), ZOOM_MIN, ZOOM_MAX);
+    // el punto del campo que estaba bajo el centro al iniciar
+    // se mantiene bajo el centro actual
+    const wx = (pellizco.mid.x - pellizco.x) / pellizco.zoom;
+    const wy = (pellizco.mid.y - pellizco.y) / pellizco.zoom;
+    vista.zoom = zoom;
+    vista.x = mid.x - wx * zoom;
+    vista.y = mid.y - wy * zoom;
+    statusTexto.textContent = "Zoom: " + Math.round(zoom * 100) + "%";
+    return;
+  }
+
+  const w = aMundo(mx, my);
 
   if (modo === "mover" && seleccionado) {
-    seleccionado.x = mx - offsetX;
-    seleccionado.y = my - offsetY;
+    seleccionado.x = w.x - offsetX;
+    seleccionado.y = w.y - offsetY;
   }
 
   if (modo === "rotar" && seleccionado && seleccionado.rot !== undefined) {
-    seleccionado.rot = Math.atan2(my - seleccionado.y, mx - seleccionado.x);
+    seleccionado.rot = Math.atan2(w.y - seleccionado.y, w.x - seleccionado.x);
   }
 
   if (modo === "escalar" && seleccionado && seleccionado.scale !== undefined) {
-    seleccionado.scale = Math.max(0.3, Math.min(2, 1 + (my - seleccionado.y) / 150));
+    seleccionado.scale = clamp(1 + (w.y - seleccionado.y) / 150, 0.3, 2);
   }
 
   if (modo === "lapiz" && dibujando) {
-    trazoActual.push({ x: mx, y: my });
+    trazoActual.push({ x: w.x, y: w.y });
   }
 });
+
+function finPuntero(e) {
+  punteros.delete(e.pointerId);
+  if (pellizco && punteros.size < 2) {
+    pellizco = null;
+    statusTexto.textContent = ayudaModo(modo);
+  }
+  if (punteros.size === 0) soltar();
+}
+canvas.addEventListener("pointerup", finPuntero);
+canvas.addEventListener("pointercancel", finPuntero);
+
+// zoom con la rueda del mouse
+canvas.addEventListener(
+  "wheel",
+  e => {
+    e.preventDefault();
+    zoomEn(e.offsetX, e.offsetY, e.deltaY < 0 ? 1.1 : 1 / 1.1);
+  },
+  { passive: false }
+);
+
+// evita el menú contextual al mantener presionado (táctil)
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+/* ================= ACCIONES ================= */
 
 function soltar() {
   seleccionado = null;
   dibujando = false;
 }
-canvas.addEventListener("pointerup", soltar);
-canvas.addEventListener("pointercancel", soltar);
-
-/* ================= ACCIONES ================= */
 
 function limpiar() {
   trazos.length = 0;

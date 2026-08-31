@@ -1,6 +1,7 @@
 /* =====================================================
    Pizarra Táctica · Kayak Polo — Interfaz
    Estilo: glassmorphism + acentos agua (cian/azul)
+   Responsive: en móvil la barra pasa al fondo (dock)
    ===================================================== */
 
 :root {
@@ -29,6 +30,12 @@ body {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 canvas {
@@ -236,30 +243,32 @@ canvas.cur-lapiz {
     inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
-/* --- Tooltips --- */
+/* --- Tooltips (solo punteros finos: no se ven en táctil) --- */
 
-[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute;
-  top: calc(100% + 9px);
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 5px 10px;
-  border-radius: 8px;
-  background: rgba(4, 10, 22, 0.94);
-  border: 1px solid var(--glass-border);
-  color: var(--text);
-  font-size: 11.5px;
-  font-weight: 500;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 20;
-}
+@media (hover: hover) and (pointer: fine) {
+  [data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    top: calc(100% + 9px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: rgba(4, 10, 22, 0.94);
+    border: 1px solid var(--glass-border);
+    color: var(--text);
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 20;
+  }
 
-[data-tip]:hover::after {
-  opacity: 1;
+  [data-tip]:hover::after {
+    opacity: 1;
+  }
 }
 
 button:focus-visible {
@@ -326,26 +335,111 @@ button:focus-visible {
   }
 }
 
-@media (max-width: 720px) {
-  .topbar {
-    gap: 8px;
-    padding: 8px 10px;
-    border-radius: 16px;
+/* Táctil: iconos un poco más grandes */
+@media (pointer: coarse) {
+  .tool svg {
+    width: 20px;
+    height: 20px;
   }
 
-  .brand-text,
+  .btn svg {
+    width: 19px;
+    height: 19px;
+  }
+}
+
+/* Móvil vertical: barra en el borde izquierdo, en columna,
+   para no tapar el arco ni el centro del campo */
+@media (max-width: 720px) {
+  .topbar {
+    top: 50%;
+    bottom: auto;
+    left: 12px;
+    transform: translateY(-50%);
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 8px;
+    border-radius: 20px;
+    animation: entrar-izq 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .brand,
+  .topbar-divider {
+    display: none;
+  }
+
+  .tools,
+  .actions {
+    flex-direction: column;
+    gap: 4px;
+  }
+
   .tool span,
   .btn span {
     display: none;
   }
 
-  .brand {
-    padding-right: 0;
+  .tool,
+  .btn {
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 14px;
+  }
+
+  .statusbar {
+    top: auto;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    gap: 7px;
+    padding: 6px 12px;
+    font-size: 11.5px;
+    max-width: calc(100vw - 20px);
+  }
+}
+
+@keyframes entrar-izq {
+  from { opacity: 0; transform: translate(-16px, -50%); }
+  to   { opacity: 1; transform: translate(0, -50%); }
+}
+
+/* Móvil horizontal: dock abajo (solo íconos) y estado arriba a la
+   izquierda, lejos del arco */
+@media (orientation: landscape) and (min-width: 721px) and (max-height: 480px) {
+  .topbar {
+    top: auto;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    gap: 5px;
+    padding: 8px 10px;
+    animation: subir 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .brand,
+  .topbar-divider {
+    display: none;
+  }
+
+  .tool span,
+  .btn span {
+    display: none;
   }
 
   .tool,
   .btn {
-    padding: 10px;
+    padding: 12px;
+    justify-content: center;
+  }
+
+  .statusbar {
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    bottom: auto;
+    left: 12px;
+    transform: none;
+    max-width: none;
+    gap: 7px;
+    padding: 6px 12px;
+    font-size: 11.5px;
   }
 }
 
