@@ -1,0 +1,530 @@
+diff --git a/index.html b/index.html
+index 30bdb56..ae4bdd0 100644
+--- a/index.html
++++ b/index.html
+@@ -2,8 +2,12 @@
+ <html lang="es">
+ <head>
+   <meta charset="UTF-8" />
+-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+   <title>Pizarra Táctica · Kayak Polo</title>
++  <meta name="theme-color" content="#0b1c33" />
++  <meta name="mobile-web-app-capable" content="yes" />
++  <meta name="apple-mobile-web-app-capable" content="yes" />
++  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛶</text></svg>" />
+   <link rel="preconnect" href="https://fonts.googleapis.com" />
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+@@ -64,6 +68,15 @@
+     <div class="topbar-divider" aria-hidden="true"></div>
+ 
+     <div class="actions">
++      <button class="btn btn-ghost" id="btn-recuadrar" data-tip="Recuadrar el campo (0)">
++        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
++          <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
++          <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
++          <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
++          <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
++        </svg>
++        <span>Recuadrar</span>
++      </button>
+       <button class="btn btn-ghost" id="btn-limpiar" data-tip="Borrar todos los trazos">
+         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+           <path d="M3 6h18"/>
+diff --git a/script.js b/script.js
+index fa1c1a5..a530a37 100644
+--- a/script.js
++++ b/script.js
+@@ -1,6 +1,7 @@
+ /* =====================================================
+    Pizarra Táctica · Kayak Polo
+-   Motor de la pizarra + interfaz
++   Motor de la pizarra + interfaz (mouse, táctil y lápiz)
++   Vista: zoom con pinch/rueda + pan con 2 dedos
+    ===================================================== */
+ 
+ /* ================= CANVAS ================= */
+@@ -21,6 +22,36 @@ let offsetX = 0;
+ let offsetY = 0;
+ let dibujando = false;
+ 
++/* ================= VISTA (zoom y desplazamiento) ================= */
++
++const ZOOM_MIN = 0.5;
++const ZOOM_MAX = 3;
++const vista = { zoom: 1, x: 0, y: 0 };
++let vistaObjetivo = null; // destino animado (recuadrar)
++let pellizco = null;     // estado del gesto de 2 dedos
++const punteros = new Map(); // punteros activos sobre el canvas
++
++const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
++
++// de coordenadas de pantalla a coordenadas del campo
++function aMundo(sx, sy) {
++  return { x: (sx - vista.x) / vista.zoom, y: (sy - vista.y) / vista.zoom };
++}
++
++// zoom manteniendo fijo el punto (sx, sy)
++function zoomEn(sx, sy, factor) {
++  const zoom = clamp(vista.zoom * factor, ZOOM_MIN, ZOOM_MAX);
++  const w = aMundo(sx, sy);
++  vista.zoom = zoom;
++  vista.x = sx - w.x * zoom;
++  vista.y = sy - w.y * zoom;
++  vistaObjetivo = null;
++}
++
++function recuadrar() {
++  vistaObjetivo = { zoom: 1, x: 0, y: 0 };
++}
++
+ /* ================= IMÁGENES ================= */
+ 
+ const fondo = new Image();
+@@ -50,10 +81,13 @@ let trazoActual = [];
+ /* ================= INTERFAZ ================= */
+ 
+ const botonesModo = document.querySelectorAll(".tool");
++const btnRecuadrar = document.getElementById("btn-recuadrar");
+ const btnLimpiar = document.getElementById("btn-limpiar");
+ const btnGuardar = document.getElementById("btn-guardar");
+ const statusTexto = document.getElementById("status-texto");
+ 
++const TOQUE = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
++
+ const AYUDAS = {
+   mover: "Mover — arrastra los botes y la pelota",
+   rotar: "Rotar — arrastra alrededor del bote para girarlo",
+@@ -61,24 +95,29 @@ const AYUDAS = {
+   lapiz: "Lápiz — dibuja sobre el campo"
+ };
+ 
++function ayudaModo(m) {
++  return AYUDAS[m] + (TOQUE ? " · 2 dedos: zoom y mover" : "");
++}
++
+ function avisar(mensaje) {
+   statusTexto.textContent = mensaje;
+   clearTimeout(avisar.t);
+   avisar.t = setTimeout(() => {
+-    statusTexto.textContent = AYUDAS[modo];
++    statusTexto.textContent = ayudaModo(modo);
+   }, 2000);
+ }
+ 
+ function setModo(m) {
+   modo = m;
+   botonesModo.forEach(b => b.classList.toggle("is-active", b.dataset.modo === m));
+-  statusTexto.textContent = AYUDAS[m];
++  statusTexto.textContent = ayudaModo(m);
+   canvas.className = "cur-" + m;
+ }
+ 
+ botonesModo.forEach(b =>
+   b.addEventListener("click", () => setModo(b.dataset.modo))
+ );
++btnRecuadrar.addEventListener("click", recuadrar);
+ btnLimpiar.addEventListener("click", limpiar);
+ btnGuardar.addEventListener("click", guardar);
+ 
+@@ -103,6 +142,7 @@ window.addEventListener("keydown", e => {
+     case "r": case "2": setModo("rotar"); break;
+     case "e": case "3": setModo("escalar"); break;
+     case "p": case "4": setModo("lapiz"); break;
++    case "0": recuadrar(); break;
+   }
+ });
+ 
+@@ -120,8 +160,8 @@ function anillo(x, y, radio) {
+   ctx.beginPath();
+   ctx.arc(x, y, radio, 0, Math.PI * 2);
+   ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+-  ctx.lineWidth = 2.5;
+-  ctx.setLineDash([7, 6]);
++  ctx.lineWidth = 2.5 / vista.zoom;
++  ctx.setLineDash([7 / vista.zoom, 6 / vista.zoom]);
+   ctx.stroke();
+   ctx.setLineDash([]);
+ }
+@@ -145,7 +185,7 @@ function dibujarPelota() {
+   ctx.arc(pelota.x, pelota.y, pelota.r, 0, Math.PI * 2);
+   ctx.fillStyle = "white";
+   ctx.fill();
+-  ctx.lineWidth = 2;
++  ctx.lineWidth = 2 / vista.zoom;
+   ctx.strokeStyle = "rgba(15, 23, 42, 0.75)";
+   ctx.stroke();
+ 
+@@ -165,7 +205,24 @@ function dibujarTrazos() {
+ }
+ 
+ function loop() {
++  // animación suave al recuadrar
++  if (vistaObjetivo) {
++    vista.zoom += (vistaObjetivo.zoom - vista.zoom) * 0.25;
++    vista.x += (vistaObjetivo.x - vista.x) * 0.25;
++    vista.y += (vistaObjetivo.y - vista.y) * 0.25;
++    if (
++      Math.abs(vista.zoom - vistaObjetivo.zoom) < 0.002 &&
++      Math.abs(vista.x - vistaObjetivo.x) < 0.5 &&
++      Math.abs(vista.y - vistaObjetivo.y) < 0.5
++    ) {
++      Object.assign(vista, vistaObjetivo);
++      vistaObjetivo = null;
++    }
++  }
++
++  ctx.setTransform(1, 0, 0, 1, 0, 0);
+   ctx.clearRect(0, 0, canvas.width, canvas.height);
++  ctx.setTransform(vista.zoom, 0, 0, vista.zoom, vista.x, vista.y);
+   dibujarFondo();
+   dibujarBotes();
+   dibujarPelota();
+@@ -189,24 +246,44 @@ const imagenLista = () => {
+ canvas.addEventListener("pointerdown", e => {
+   const mx = e.offsetX;
+   const my = e.offsetY;
++  punteros.set(e.pointerId, { x: mx, y: my });
++  canvas.setPointerCapture(e.pointerId);
++
++  // segundo dedo: empieza zoom/pan con 2 dedos
++  if (punteros.size === 2) {
++    soltar();
++    vistaObjetivo = null;
++    const [a, b] = [...punteros.values()];
++    pellizco = {
++      dist: Math.max(10, Math.hypot(b.x - a.x, b.y - a.y)),
++      mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
++      zoom: vista.zoom,
++      x: vista.x,
++      y: vista.y
++    };
++    return;
++  }
++  if (punteros.size > 2) return;
++
++  const w = aMundo(mx, my);
++  const toque = e.pointerType === "touch";
++  const margen = toque ? 14 : 4; // targets más generosos con el dedo
+ 
+   // pelota
+-  if (Math.hypot(mx - pelota.x, my - pelota.y) < pelota.r + 6) {
++  if (Math.hypot(w.x - pelota.x, w.y - pelota.y) < pelota.r + 6 + margen) {
+     seleccionado = pelota;
+-    offsetX = mx - pelota.x;
+-    offsetY = my - pelota.y;
+-    canvas.setPointerCapture(e.pointerId);
++    offsetX = w.x - pelota.x;
++    offsetY = w.y - pelota.y;
+     return;
+   }
+ 
+   // botes (el de arriba primero)
+   for (let i = botes.length - 1; i >= 0; i--) {
+     const b = botes[i];
+-    if (Math.hypot(mx - b.x, my - b.y) < (TAM / 2) * b.scale + 4) {
++    if (Math.hypot(w.x - b.x, w.y - b.y) < (TAM / 2) * b.scale + margen) {
+       seleccionado = b;
+-      offsetX = mx - b.x;
+-      offsetY = my - b.y;
+-      canvas.setPointerCapture(e.pointerId);
++      offsetX = w.x - b.x;
++      offsetY = w.y - b.y;
+       return;
+     }
+   }
+@@ -214,42 +291,83 @@ canvas.addEventListener("pointerdown", e => {
+   // lápiz
+   if (modo === "lapiz") {
+     dibujando = true;
+-    trazoActual = [{ x: mx, y: my }];
++    trazoActual = [{ x: w.x, y: w.y }];
+     trazos.push(trazoActual);
+-    canvas.setPointerCapture(e.pointerId);
+   }
+ });
+ 
+ canvas.addEventListener("pointermove", e => {
+   const mx = e.offsetX;
+   const my = e.offsetY;
++  if (punteros.has(e.pointerId)) punteros.set(e.pointerId, { x: mx, y: my });
++
++  // zoom/pan con 2 dedos
++  if (pellizco && punteros.size >= 2) {
++    const [a, b] = [...punteros.values()];
++    const dist = Math.max(10, Math.hypot(b.x - a.x, b.y - a.y));
++    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
++    const zoom = clamp(pellizco.zoom * (dist / pellizco.dist), ZOOM_MIN, ZOOM_MAX);
++    // el punto del campo que estaba bajo el centro al iniciar
++    // se mantiene bajo el centro actual
++    const wx = (pellizco.mid.x - pellizco.x) / pellizco.zoom;
++    const wy = (pellizco.mid.y - pellizco.y) / pellizco.zoom;
++    vista.zoom = zoom;
++    vista.x = mid.x - wx * zoom;
++    vista.y = mid.y - wy * zoom;
++    statusTexto.textContent = "Zoom: " + Math.round(zoom * 100) + "%";
++    return;
++  }
++
++  const w = aMundo(mx, my);
+ 
+   if (modo === "mover" && seleccionado) {
+-    seleccionado.x = mx - offsetX;
+-    seleccionado.y = my - offsetY;
++    seleccionado.x = w.x - offsetX;
++    seleccionado.y = w.y - offsetY;
+   }
+ 
+   if (modo === "rotar" && seleccionado && seleccionado.rot !== undefined) {
+-    seleccionado.rot = Math.atan2(my - seleccionado.y, mx - seleccionado.x);
++    seleccionado.rot = Math.atan2(w.y - seleccionado.y, w.x - seleccionado.x);
+   }
+ 
+   if (modo === "escalar" && seleccionado && seleccionado.scale !== undefined) {
+-    seleccionado.scale = Math.max(0.3, Math.min(2, 1 + (my - seleccionado.y) / 150));
++    seleccionado.scale = clamp(1 + (w.y - seleccionado.y) / 150, 0.3, 2);
+   }
+ 
+   if (modo === "lapiz" && dibujando) {
+-    trazoActual.push({ x: mx, y: my });
++    trazoActual.push({ x: w.x, y: w.y });
+   }
+ });
+ 
++function finPuntero(e) {
++  punteros.delete(e.pointerId);
++  if (pellizco && punteros.size < 2) {
++    pellizco = null;
++    statusTexto.textContent = ayudaModo(modo);
++  }
++  if (punteros.size === 0) soltar();
++}
++canvas.addEventListener("pointerup", finPuntero);
++canvas.addEventListener("pointercancel", finPuntero);
++
++// zoom con la rueda del mouse
++canvas.addEventListener(
++  "wheel",
++  e => {
++    e.preventDefault();
++    zoomEn(e.offsetX, e.offsetY, e.deltaY < 0 ? 1.1 : 1 / 1.1);
++  },
++  { passive: false }
++);
++
++// evita el menú contextual al mantener presionado (táctil)
++canvas.addEventListener("contextmenu", e => e.preventDefault());
++
++/* ================= ACCIONES ================= */
++
+ function soltar() {
+   seleccionado = null;
+   dibujando = false;
+ }
+-canvas.addEventListener("pointerup", soltar);
+-canvas.addEventListener("pointercancel", soltar);
+-
+-/* ================= ACCIONES ================= */
+ 
+ function limpiar() {
+   trazos.length = 0;
+diff --git a/styles.css b/styles.css
+index 3336add..fa3cebd 100644
+--- a/styles.css
++++ b/styles.css
+@@ -1,6 +1,7 @@
+ /* =====================================================
+    Pizarra Táctica · Kayak Polo — Interfaz
+    Estilo: glassmorphism + acentos agua (cian/azul)
++   Responsive: en móvil la barra pasa al fondo (dock)
+    ===================================================== */
+ 
+ :root {
+@@ -29,6 +30,12 @@ body {
+   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+   user-select: none;
+   -webkit-user-select: none;
++  -webkit-tap-highlight-color: transparent;
++}
++
++button {
++  touch-action: manipulation;
++  -webkit-tap-highlight-color: transparent;
+ }
+ 
+ canvas {
+@@ -236,30 +243,32 @@ canvas.cur-lapiz {
+     inset 0 1px 0 rgba(255, 255, 255, 0.35);
+ }
+ 
+-/* --- Tooltips --- */
+-
+-[data-tip]::after {
+-  content: attr(data-tip);
+-  position: absolute;
+-  top: calc(100% + 9px);
+-  left: 50%;
+-  transform: translateX(-50%);
+-  padding: 5px 10px;
+-  border-radius: 8px;
+-  background: rgba(4, 10, 22, 0.94);
+-  border: 1px solid var(--glass-border);
+-  color: var(--text);
+-  font-size: 11.5px;
+-  font-weight: 500;
+-  white-space: nowrap;
+-  pointer-events: none;
+-  opacity: 0;
+-  transition: opacity 0.15s;
+-  z-index: 20;
+-}
++/* --- Tooltips (solo punteros finos: no se ven en táctil) --- */
++
++@media (hover: hover) and (pointer: fine) {
++  [data-tip]::after {
++    content: attr(data-tip);
++    position: absolute;
++    top: calc(100% + 9px);
++    left: 50%;
++    transform: translateX(-50%);
++    padding: 5px 10px;
++    border-radius: 8px;
++    background: rgba(4, 10, 22, 0.94);
++    border: 1px solid var(--glass-border);
++    color: var(--text);
++    font-size: 11.5px;
++    font-weight: 500;
++    white-space: nowrap;
++    pointer-events: none;
++    opacity: 0;
++    transition: opacity 0.15s;
++    z-index: 20;
++  }
+ 
+-[data-tip]:hover::after {
+-  opacity: 1;
++  [data-tip]:hover::after {
++    opacity: 1;
++  }
+ }
+ 
+ button:focus-visible {
+@@ -326,26 +335,111 @@ button:focus-visible {
+   }
+ }
+ 
++/* Táctil: iconos un poco más grandes */
++@media (pointer: coarse) {
++  .tool svg {
++    width: 20px;
++    height: 20px;
++  }
++
++  .btn svg {
++    width: 19px;
++    height: 19px;
++  }
++}
++
++/* Móvil vertical: barra en el borde izquierdo, en columna,
++   para no tapar el arco ni el centro del campo */
+ @media (max-width: 720px) {
+   .topbar {
++    top: 50%;
++    bottom: auto;
++    left: 12px;
++    transform: translateY(-50%);
++    flex-direction: column;
++    align-items: center;
+     gap: 8px;
+-    padding: 8px 10px;
+-    border-radius: 16px;
++    padding: 10px 8px;
++    border-radius: 20px;
++    animation: entrar-izq 0.45s cubic-bezier(0.22, 1, 0.36, 1);
++  }
++
++  .brand,
++  .topbar-divider {
++    display: none;
++  }
++
++  .tools,
++  .actions {
++    flex-direction: column;
++    gap: 4px;
+   }
+ 
+-  .brand-text,
+   .tool span,
+   .btn span {
+     display: none;
+   }
+ 
+-  .brand {
+-    padding-right: 0;
++  .tool,
++  .btn {
++    width: 48px;
++    height: 48px;
++    padding: 0;
++    justify-content: center;
++    border-radius: 14px;
++  }
++
++  .statusbar {
++    top: auto;
++    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
++    gap: 7px;
++    padding: 6px 12px;
++    font-size: 11.5px;
++    max-width: calc(100vw - 20px);
++  }
++}
++
++@keyframes entrar-izq {
++  from { opacity: 0; transform: translate(-16px, -50%); }
++  to   { opacity: 1; transform: translate(0, -50%); }
++}
++
++/* Móvil horizontal: dock abajo (solo íconos) y estado arriba a la
++   izquierda, lejos del arco */
++@media (orientation: landscape) and (min-width: 721px) and (max-height: 480px) {
++  .topbar {
++    top: auto;
++    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
++    gap: 5px;
++    padding: 8px 10px;
++    animation: subir 0.45s cubic-bezier(0.22, 1, 0.36, 1);
++  }
++
++  .brand,
++  .topbar-divider {
++    display: none;
++  }
++
++  .tool span,
++  .btn span {
++    display: none;
+   }
+ 
+   .tool,
+   .btn {
+-    padding: 10px;
++    padding: 12px;
++    justify-content: center;
++  }
++
++  .statusbar {
++    top: calc(12px + env(safe-area-inset-top, 0px));
++    bottom: auto;
++    left: 12px;
++    transform: none;
++    max-width: none;
++    gap: 7px;
++    padding: 6px 12px;
++    font-size: 11.5px;
+   }
+ }
+ 
