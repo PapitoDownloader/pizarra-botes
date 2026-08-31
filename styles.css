@@ -1,7 +1,7 @@
 /* =====================================================
    Pizarra Táctica · Kayak Polo — Interfaz
    Estilo: glassmorphism + acentos agua (cian/azul)
-   Responsive: en móvil la barra pasa al fondo (dock)
+   Responsive: en móvil la barra conserva el comportamiento anterior
    ===================================================== */
 
 :root {
@@ -51,7 +51,7 @@ canvas.cur-lapiz {
   cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'/></svg>") 2 21, crosshair;
 }
 
-/* ================= BARRA SUPERIOR ================= */
+/* ================= BARRA ================= */
 
 .topbar {
   position: fixed;
@@ -75,7 +75,23 @@ canvas.cur-lapiz {
     0 20px 50px rgba(2, 8, 20, 0.45),
     0 2px 8px rgba(2, 8, 20, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition:
+    left 0.18s ease,
+    top 0.18s ease,
+    width 0.18s ease,
+    padding 0.18s ease,
+    gap 0.18s ease,
+    border-radius 0.18s ease,
+    transform 0.18s ease;
   animation: bajar 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.topbar.posicion-libre {
+  transform: none;
+}
+
+.topbar.arrastrando {
+  transition: none;
 }
 
 @keyframes bajar {
@@ -83,12 +99,36 @@ canvas.cur-lapiz {
   to   { opacity: 1; transform: translate(-50%, 0); }
 }
 
-/* Asa para mover la barra (solo se ve en móvil) */
 .barra-handle {
   display: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-dim);
+  cursor: grab;
+  touch-action: none;
+  transition: transform 0.12s ease, color 0.18s ease, background 0.18s ease;
 }
 
-/* --- Marca --- */
+.barra-handle:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.topbar.arrastrando .barra-handle,
+.barra-handle:active {
+  cursor: grabbing;
+  transform: scale(1.03);
+}
+
+.barra-handle svg {
+  width: 17px;
+  height: 17px;
+}
 
 .brand {
   display: flex;
@@ -134,68 +174,17 @@ canvas.cur-lapiz {
   color: var(--accent-a);
 }
 
-/* --- Herramientas --- */
-
-.tools {
-  display: flex;
-  gap: 4px;
-}
-
-.tool {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 14px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--text-dim);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 0.18s, background 0.18s, border-color 0.18s,
-    box-shadow 0.18s, transform 0.12s;
-}
-
-.tool svg {
-  width: 18px;
-  height: 18px;
-}
-
-.tool:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.tool:active {
-  transform: scale(0.96);
-}
-
-.tool.is-active {
-  color: #fff;
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
-  border-color: rgba(255, 255, 255, 0.25);
-  box-shadow: 0 6px 18px rgba(56, 132, 255, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-
-/* --- Separador --- */
-
-.topbar-divider {
-  width: 1px;
-  align-self: stretch;
-  background: var(--glass-border);
-}
-
-/* --- Acciones --- */
-
+.tools,
 .actions {
   display: flex;
   gap: 8px;
 }
 
+.tools {
+  gap: 4px;
+}
+
+.tool,
 .btn {
   position: relative;
   display: inline-flex;
@@ -212,13 +201,38 @@ canvas.cur-lapiz {
     box-shadow 0.18s, transform 0.12s, filter 0.18s;
 }
 
-.btn svg {
-  width: 17px;
-  height: 17px;
+.tool {
+  background: transparent;
+  color: var(--text-dim);
 }
 
+.tool svg,
+.btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.tool:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tool:active,
 .btn:active {
   transform: scale(0.96);
+}
+
+.tool.is-active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6px 18px rgba(56, 132, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.topbar-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--glass-border);
 }
 
 .btn-ghost {
@@ -237,18 +251,14 @@ canvas.cur-lapiz {
   color: #fff;
   background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
   border-color: rgba(255, 255, 255, 0.28);
-  box-shadow: 0 6px 18px rgba(34, 211, 238, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 0 6px 18px rgba(34, 211, 238, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .btn-primary:hover {
   filter: brightness(1.12);
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
-
-/* --- Tooltips (solo punteros finos: no se ven en táctil) --- */
 
 @media (hover: hover) and (pointer: fine) {
   [data-tip]::after {
@@ -281,6 +291,170 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+/* ================= BARRA EN PC ================= */
+
+.topbar.modo-pc .barra-handle {
+  display: grid;
+}
+
+.topbar.modo-pc[data-layout="horizontal"] {
+  flex-direction: row;
+  align-items: center;
+}
+
+.topbar.modo-pc[data-layout="vertical"] {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  width: min(228px, calc(100vw - 32px));
+  gap: 10px;
+  padding: 12px 10px;
+}
+
+.topbar.modo-pc[data-layout="vertical"] .brand {
+  padding-right: 0;
+  justify-content: center;
+}
+
+.topbar.modo-pc[data-layout="vertical"] .tools,
+.topbar.modo-pc[data-layout="vertical"] .actions {
+  flex-direction: column;
+}
+
+.topbar.modo-pc[data-layout="vertical"] .tool,
+.topbar.modo-pc[data-layout="vertical"] .btn {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.topbar.modo-pc[data-layout="vertical"] .topbar-divider {
+  width: auto;
+  height: 1px;
+}
+
+.topbar.modo-pc[data-layout="vertical"] .barra-handle {
+  align-self: center;
+}
+
+/* ================= BARRA EN MÓVIL ================= */
+
+.topbar.modo-movil {
+  top: 50%;
+  left: 12px;
+  bottom: auto;
+  transform: translateY(-50%);
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  max-width: calc(100vw - 24px);
+  border-radius: 20px;
+}
+
+.topbar.modo-movil .barra-handle {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.topbar.modo-movil .barra-handle svg {
+  width: 15px;
+  height: 15px;
+}
+
+.topbar.modo-movil .brand,
+.topbar.modo-movil .topbar-divider {
+  display: none;
+}
+
+.topbar.modo-movil .tools,
+.topbar.modo-movil .actions {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.topbar.modo-movil .tool span,
+.topbar.modo-movil .btn span {
+  display: none;
+}
+
+.topbar.modo-movil .tool,
+.topbar.modo-movil .btn {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 14px;
+}
+
+.topbar.modo-movil.barra-abajo {
+  top: auto;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  flex-direction: row;
+  padding: 8px 10px;
+}
+
+.topbar.modo-movil.barra-abajo .tools,
+.topbar.modo-movil.barra-abajo .actions {
+  flex-direction: row;
+}
+
+.topbar.modo-movil.barra-abajo .tool,
+.topbar.modo-movil.barra-abajo .btn {
+  width: 44px;
+  height: 44px;
+}
+
+.topbar.modo-movil.barra-abajo .barra-handle svg {
+  transform: rotate(90deg);
+}
+
+.topbar.modo-movil.barra-abajo ~ .statusbar {
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  bottom: auto;
+}
+
+@media (orientation: landscape) and (max-height: 480px) {
+  .topbar.modo-movil {
+    top: auto;
+    left: 50%;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    flex-direction: row;
+    gap: 5px;
+    padding: 8px 10px;
+  }
+
+  .topbar.modo-movil .tools,
+  .topbar.modo-movil .actions {
+    flex-direction: row;
+  }
+
+  .topbar.modo-movil .tool,
+  .topbar.modo-movil .btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .topbar.modo-movil .barra-handle svg {
+    transform: rotate(90deg);
+  }
+
+  .statusbar {
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    bottom: auto;
+    left: 12px;
+    transform: none;
+    max-width: none;
+    gap: 7px;
+    padding: 6px 12px;
+    font-size: 11.5px;
+  }
+}
+
 /* ================= BARRA DE ESTADO ================= */
 
 .statusbar {
@@ -288,7 +462,7 @@ button:focus-visible {
   bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 10;
+  z-index: 9;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -332,196 +506,10 @@ button:focus-visible {
   color: rgba(234, 242, 255, 0.3);
 }
 
-/* ================= RESPONSIVE ================= */
+/* ================= AJUSTES RESPONSIVE ================= */
 
-@media (max-width: 860px) {
-  .status-hint {
-    display: none;
-  }
-}
-
-/* Táctil: iconos un poco más grandes */
-@media (pointer: coarse) {
-  .tool svg {
-    width: 20px;
-    height: 20px;
-  }
-
-  .btn svg {
-    width: 19px;
-    height: 19px;
-  }
-}
-
-/* Móvil vertical: barra en el borde izquierdo, en columna,
-   para no tapar el arco ni el centro del campo */
-@media (max-width: 720px) {
-  .topbar {
-    top: 50%;
-    bottom: auto;
-    left: 12px;
-    transform: translateY(-50%);
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 8px;
-    border-radius: 20px;
-    animation: entrar-izq 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-    transition: top 0.3s ease, left 0.3s ease, bottom 0.3s ease,
-      transform 0.3s ease, border-radius 0.3s ease;
-  }
-
-  /* Asa para mover la barra (visible solo en móvil) */
-  .barra-handle {
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid var(--glass-border);
-    color: var(--text-dim);
-    cursor: grab;
-    touch-action: none;
-  }
-
-  .barra-handle:active {
-    cursor: grabbing;
-    transform: scale(1.12);
-    color: var(--text);
-  }
-
-  .barra-handle svg {
-    width: 15px;
-    height: 15px;
-  }
-
-  /* Barra movida hacia abajo: horizontal, tipo dock */
-  .topbar.barra-abajo {
-    top: auto;
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-    left: 50%;
-    transform: translateX(-50%);
-    flex-direction: row;
-    padding: 8px 10px;
-  }
-
-  .topbar.barra-abajo .tools,
-  .topbar.barra-abajo .actions {
-    flex-direction: row;
-  }
-
-  .topbar.barra-abajo .topbar-divider {
-    display: none;
-  }
-
-  .topbar.barra-abajo .tool,
-  .topbar.barra-abajo .btn {
-    width: 44px;
-    height: 44px;
-  }
-
-  .topbar.barra-abajo .barra-handle svg {
-    transform: rotate(90deg);
-  }
-
-  /* Con la barra abajo, el estado pasa arriba */
-  .topbar.barra-abajo ~ .statusbar {
-    top: calc(12px + env(safe-area-inset-top, 0px));
-    bottom: auto;
-  }
-
-  .brand,
-  .topbar-divider {
-    display: none;
-  }
-
-  .tools,
-  .actions {
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .tool span,
-  .btn span {
-    display: none;
-  }
-
-  .tool,
-  .btn {
-    width: 48px;
-    height: 48px;
-    padding: 0;
-    justify-content: center;
-    border-radius: 14px;
-  }
-
-  .statusbar {
-    top: auto;
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-    gap: 7px;
-    padding: 6px 12px;
-    font-size: 11.5px;
-    max-width: calc(100vw - 20px);
-  }
-}
-
-@keyframes entrar-izq {
-  from { opacity: 0; transform: translate(-16px, -50%); }
-  to   { opacity: 1; transform: translate(0, -50%); }
-}
-
-/* Móvil horizontal: dock abajo (solo íconos) y estado arriba a la
-   izquierda, lejos del arco */
-@media (orientation: landscape) and (min-width: 721px) and (max-height: 480px) {
-  .topbar {
-    top: auto;
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-    gap: 5px;
-    padding: 8px 10px;
-    animation: subir 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .brand,
-  .topbar-divider {
-    display: none;
-  }
-
-  .tool span,
-  .btn span {
-    display: none;
-  }
-
-  .tool,
-  .btn {
-    padding: 12px;
-    justify-content: center;
-  }
-
-  .statusbar {
-    top: calc(12px + env(safe-area-inset-top, 0px));
-    bottom: auto;
-    left: 12px;
-    transform: none;
-    max-width: none;
-    gap: 7px;
-    padding: 6px 12px;
-    font-size: 11.5px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .topbar,
-  .statusbar,
-  .status-dot {
-    animation: none;
-  }
-}
-/* PC / notebook: versión compacta para que la barra
-   quepa en una sola fila (no tapa el arco ni el campo) */
 @media (max-width: 1200px) and (min-width: 721px) {
-  .topbar {
+  .topbar.modo-pc[data-layout="horizontal"] {
     gap: 10px;
     padding: 8px 12px;
   }
@@ -558,5 +546,38 @@ button:focus-visible {
     padding: 8px 12px;
     gap: 7px;
     font-size: 13px;
+  }
+}
+
+@media (max-width: 860px) {
+  .status-hint {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .tool svg,
+  .btn svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+@media (max-width: 720px) {
+  .statusbar {
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    gap: 7px;
+    padding: 6px 12px;
+    font-size: 11.5px;
+    max-width: calc(100vw - 20px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar,
+  .statusbar,
+  .status-dot {
+    animation: none;
+    transition: none;
   }
 }

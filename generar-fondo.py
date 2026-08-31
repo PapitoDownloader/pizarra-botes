@@ -30,7 +30,8 @@ LINEA_M = 0.10
 POSTE_ARCO_M = 0.08
 
 # Medidas reglamentarias del único arco que se dibuja sobre el campo.
-ARCO_ANCHO_M = 1.5
+# El ancho pasa a 2 m exactos, es decir 100 píxeles a la escala compartida.
+ARCO_ANCHO_M = 2.0
 ARCO_PROFUNDIDAD_M = 1.0
 # Paso de la malla del arco: da una cuadrícula densa dentro del rectángulo.
 ARCO_MALLA_PASO_M = 0.125

@@ -17,6 +17,11 @@ const FONDO_ANCHO_PX = 1178;
 const FONDO_ALTO_PX = 1928;
 const CAMPO_ORIGEN_X = (FONDO_ANCHO_PX - CAMPO_ANCHO_M * ESCALA_PX_M) / 2;
 const CAMPO_ORIGEN_Y = (FONDO_ALTO_PX - CAMPO_LARGO_M * ESCALA_PX_M) / 2;
+const ASSET_VERSION = "2026-08-31-02";
+
+function assetUrl(path) {
+  return `${path}?v=${ASSET_VERSION}`;
+}
 
 // Convierte coordenadas tácticas (x: ancho, y: largo) a coordenadas de mundo.
 function metrosAMundo(xMetros, yMetros) {
@@ -39,18 +44,18 @@ function calcularBase() {
   base.y = (canvas.height - fondoAlto * base.escala) / 2;
 }
 
-// Escala final con la que se pinta todo: ajuste del fondo por el zoom actual.
-function escalaTotal() {
-  return base.escala * vista.zoom;
-}
-
 function ajustarCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
   calcularBase();
 }
-ajustarCanvas();
-window.addEventListener("resize", ajustarCanvas);
+
+// Escala final con la que se pinta todo: ajuste del fondo por el zoom actual.
+function escalaTotal() {
+  return base.escala * vista.zoom;
+}
+
+/* ================= ESTADO GENERAL ================= */
 
 let modo = "mover";
 let seleccionado = null;
@@ -63,15 +68,13 @@ let dibujando = false;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
 const vista = { zoom: 1, x: 0, y: 0 };
-let vistaObjetivo = null; // destino animado (recuadrar)
-let pellizco = null;     // estado del gesto de 2 dedos
-const punteros = new Map(); // punteros activos sobre el canvas
+let vistaObjetivo = null;
+let pellizco = null;
+const punteros = new Map();
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // de coordenadas de pantalla a coordenadas del campo (mundo = píxeles del fondo).
-// Usa la misma escala base y el mismo origen con los que se dibuja el fondo,
-// para que todo siga siendo seleccionable y movible con cualquier zoom.
 function aMundo(sx, sy) {
   const escala = escalaTotal();
   return {
@@ -80,10 +83,8 @@ function aMundo(sx, sy) {
   };
 }
 
-// zoom manteniendo fijo el punto (sx, sy)
 function zoomEn(sx, sy, factor) {
   const zoom = clamp(vista.zoom * factor, ZOOM_MIN, ZOOM_MAX);
-  // punto de referencia en el espacio ya ajustado al fondo (zoom 1, sin pan)
   const ux = (sx - vista.x) / vista.zoom;
   const uy = (sy - vista.y) / vista.zoom;
   vista.zoom = zoom;
@@ -101,14 +102,17 @@ function recuadrar() {
 const fondo = new Image();
 const imgRojo = new Image();
 const imgAzul = new Image();
+const imgPelota = new Image();
 
-fondo.src = "FONDO.png";
-imgRojo.src = "Kayapolored__1_-removebg-preview.png";
-imgAzul.src = "KayapoloRC__1_-removebg-preview.png";
+fondo.src = assetUrl("FONDO.png");
+imgRojo.src = assetUrl("bote-rojo.png");
+imgAzul.src = assetUrl("bote-azul.png");
+imgPelota.src = assetUrl("pelota.png");
 
 /* ================= OBJETOS ================= */
 
-const TAM = 70;
+const TAM_BOTE = 70;
+const TAM_PELOTA = 30;
 const botes = [];
 
 // Formación inicial: los dos equipos ordenados sobre el costado izquierdo del
@@ -130,7 +134,7 @@ formacionAzul.forEach(([x, y]) => {
 });
 
 const centroCampo = metrosAMundo(CAMPO_ANCHO_M / 2, CAMPO_LARGO_M / 2);
-const pelota = { x: centroCampo.x, y: centroCampo.y, r: 10 };
+const pelota = { x: centroCampo.x, y: centroCampo.y, r: 11 };
 
 const trazos = [];
 let trazoActual = [];
@@ -142,6 +146,8 @@ const btnRecuadrar = document.getElementById("btn-recuadrar");
 const btnLimpiar = document.getElementById("btn-limpiar");
 const btnGuardar = document.getElementById("btn-guardar");
 const statusTexto = document.getElementById("status-texto");
+const barra = document.getElementById("toolbar");
+const barraHandle = document.getElementById("barra-handle");
 
 const TOQUE = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
 
@@ -150,6 +156,21 @@ const AYUDAS = {
   rotar: "Rotar — arrastra alrededor del bote para girarlo",
   escalar: "Escalar — arrastra hacia arriba/abajo para cambiar el tamaño",
   lapiz: "Lápiz — dibuja sobre el campo"
+};
+
+const memoria = {
+  get(clave) {
+    try {
+      return localStorage.getItem(clave);
+    } catch {
+      return null;
+    }
+  },
+  set(clave, valor) {
+    try {
+      localStorage.setItem(clave, valor);
+    } catch {}
+  }
 };
 
 function ayudaModo(m) {
@@ -161,7 +182,7 @@ function avisar(mensaje) {
   clearTimeout(avisar.t);
   avisar.t = setTimeout(() => {
     statusTexto.textContent = ayudaModo(modo);
-  }, 2000);
+  }, 2200);
 }
 
 function setModo(m) {
@@ -171,9 +192,7 @@ function setModo(m) {
   canvas.className = "cur-" + m;
 }
 
-botonesModo.forEach(b =>
-  b.addEventListener("click", () => setModo(b.dataset.modo))
-);
+botonesModo.forEach(b => b.addEventListener("click", () => setModo(b.dataset.modo)));
 btnRecuadrar.addEventListener("click", recuadrar);
 btnLimpiar.addEventListener("click", limpiar);
 btnGuardar.addEventListener("click", guardar);
@@ -194,12 +213,27 @@ window.addEventListener("keydown", e => {
     }
     return;
   }
+
   switch (e.key.toLowerCase()) {
-    case "v": case "1": setModo("mover"); break;
-    case "r": case "2": setModo("rotar"); break;
-    case "e": case "3": setModo("escalar"); break;
-    case "p": case "4": setModo("lapiz"); break;
-    case "0": recuadrar(); break;
+    case "v":
+    case "1":
+      setModo("mover");
+      break;
+    case "r":
+    case "2":
+      setModo("rotar");
+      break;
+    case "e":
+    case "3":
+      setModo("escalar");
+      break;
+    case "p":
+    case "4":
+      setModo("lapiz");
+      break;
+    case "0":
+      recuadrar();
+      break;
   }
 });
 
@@ -207,8 +241,6 @@ window.addEventListener("keydown", e => {
 
 function dibujarFondo() {
   if (!fondo.complete || !fondo.width) return;
-  // El fondo se dibuja en coordenadas de mundo: la escala de ajuste y el
-  // origen ya vienen aplicados en la transformación del lienzo.
   ctx.drawImage(fondo, 0, 0, fondoAncho, fondoAlto);
 }
 
@@ -229,14 +261,14 @@ function dibujarBotes() {
     ctx.translate(b.x, b.y);
     ctx.rotate(b.rot);
     ctx.scale(b.scale, b.scale);
-    ctx.drawImage(b.img, -TAM / 2, -TAM / 2, TAM, TAM);
+    ctx.drawImage(b.img, -TAM_BOTE / 2, -TAM_BOTE / 2, TAM_BOTE, TAM_BOTE);
     ctx.restore();
 
-    if (b === seleccionado) anillo(b.x, b.y, (TAM / 2) * b.scale + 8);
+    if (b === seleccionado) anillo(b.x, b.y, (TAM_BOTE / 2) * b.scale + 8);
   });
 }
 
-function dibujarPelota() {
+function dibujarPelotaRespaldo() {
   ctx.beginPath();
   ctx.arc(pelota.x, pelota.y, pelota.r, 0, Math.PI * 2);
   ctx.fillStyle = "white";
@@ -244,6 +276,14 @@ function dibujarPelota() {
   ctx.lineWidth = 2 / escalaTotal();
   ctx.strokeStyle = "rgba(15, 23, 42, 0.75)";
   ctx.stroke();
+}
+
+function dibujarPelota() {
+  if (imgPelota.complete && imgPelota.width) {
+    ctx.drawImage(imgPelota, pelota.x - TAM_PELOTA / 2, pelota.y - TAM_PELOTA / 2, TAM_PELOTA, TAM_PELOTA);
+  } else {
+    dibujarPelotaRespaldo();
+  }
 
   if (pelota === seleccionado) anillo(pelota.x, pelota.y, pelota.r + 8);
 }
@@ -261,7 +301,6 @@ function dibujarTrazos() {
 }
 
 function loop() {
-  // animación suave al recuadrar
   if (vistaObjetivo) {
     vista.zoom += (vistaObjetivo.zoom - vista.zoom) * 0.25;
     vista.x += (vistaObjetivo.x - vista.x) * 0.25;
@@ -278,14 +317,14 @@ function loop() {
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  // Una sola transformación para todo: escala base del fondo × zoom, con el
-  // mismo origen horizontal y vertical y el mismo desplazamiento (pan).
+
   const escala = escalaTotal();
   ctx.setTransform(
     escala, 0, 0, escala,
     base.x * vista.zoom + vista.x,
     base.y * vista.zoom + vista.y
   );
+
   dibujarFondo();
   dibujarBotes();
   dibujarPelota();
@@ -295,15 +334,17 @@ function loop() {
 
 /* ================= CARGA DE IMÁGENES ================= */
 
-let pendientes = 3;
+let pendientes = 4;
 const imagenLista = () => {
-  if (--pendientes === 0) loop();
+  pendientes -= 1;
+  if (pendientes === 0) loop();
 };
-[fondo, imgRojo, imgAzul].forEach(img => {
+
+[fondo, imgRojo, imgAzul, imgPelota].forEach(img => {
   img.addEventListener("load", imagenLista);
   img.addEventListener("error", imagenLista);
 });
-// El tamaño real del fondo define la escala base compartida por todo.
+
 fondo.addEventListener("load", () => {
   fondoAncho = fondo.naturalWidth || FONDO_ANCHO_PX;
   fondoAlto = fondo.naturalHeight || FONDO_ALTO_PX;
@@ -318,7 +359,6 @@ canvas.addEventListener("pointerdown", e => {
   punteros.set(e.pointerId, { x: mx, y: my });
   canvas.setPointerCapture(e.pointerId);
 
-  // segundo dedo: empieza zoom/pan con 2 dedos
   if (punteros.size === 2) {
     soltar();
     vistaObjetivo = null;
@@ -336,11 +376,8 @@ canvas.addEventListener("pointerdown", e => {
 
   const w = aMundo(mx, my);
   const toque = e.pointerType === "touch";
-  // targets más generosos con el dedo: el margen se expresa en píxeles de
-  // pantalla y se traduce a mundo con la misma escala compartida.
   const margen = (toque ? 14 : 4) / escalaTotal();
 
-  // pelota
   if (Math.hypot(w.x - pelota.x, w.y - pelota.y) < pelota.r + 6 + margen) {
     seleccionado = pelota;
     offsetX = w.x - pelota.x;
@@ -348,10 +385,9 @@ canvas.addEventListener("pointerdown", e => {
     return;
   }
 
-  // botes (el de arriba primero)
   for (let i = botes.length - 1; i >= 0; i--) {
     const b = botes[i];
-    if (Math.hypot(w.x - b.x, w.y - b.y) < (TAM / 2) * b.scale + margen) {
+    if (Math.hypot(w.x - b.x, w.y - b.y) < (TAM_BOTE / 2) * b.scale + margen) {
       seleccionado = b;
       offsetX = w.x - b.x;
       offsetY = w.y - b.y;
@@ -359,7 +395,6 @@ canvas.addEventListener("pointerdown", e => {
     }
   }
 
-  // lápiz
   if (modo === "lapiz") {
     dibujando = true;
     trazoActual = [{ x: w.x, y: w.y }];
@@ -372,14 +407,11 @@ canvas.addEventListener("pointermove", e => {
   const my = e.offsetY;
   if (punteros.has(e.pointerId)) punteros.set(e.pointerId, { x: mx, y: my });
 
-  // zoom/pan con 2 dedos
   if (pellizco && punteros.size >= 2) {
     const [a, b] = [...punteros.values()];
     const dist = Math.max(10, Math.hypot(b.x - a.x, b.y - a.y));
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const zoom = clamp(pellizco.zoom * (dist / pellizco.dist), ZOOM_MIN, ZOOM_MAX);
-    // el punto del campo que estaba bajo el centro al iniciar
-    // se mantiene bajo el centro actual
     const wx = (pellizco.mid.x - pellizco.x) / pellizco.zoom;
     const wy = (pellizco.mid.y - pellizco.y) / pellizco.zoom;
     vista.zoom = zoom;
@@ -397,7 +429,7 @@ canvas.addEventListener("pointermove", e => {
   }
 
   if (modo === "rotar" && seleccionado && seleccionado.rot !== undefined) {
-    seleccionado.rot = Math.atan2(w.y - seleccionado.y, w.x - seleccionado.x);
+    seleccionado.rot = Math.atan2(w.y - seleccionado.y, w.x - seleccionado.x) + Math.PI / 2;
   }
 
   if (modo === "escalar" && seleccionado && seleccionado.scale !== undefined) {
@@ -421,7 +453,6 @@ function finPuntero(e) {
 canvas.addEventListener("pointerup", finPuntero);
 canvas.addEventListener("pointercancel", finPuntero);
 
-// zoom con la rueda del mouse
 canvas.addEventListener(
   "wheel",
   e => {
@@ -431,7 +462,6 @@ canvas.addEventListener(
   { passive: false }
 );
 
-// evita el menú contextual al mantener presionado (táctil)
 canvas.addEventListener("contextmenu", e => e.preventDefault());
 
 /* ================= ACCIONES ================= */
@@ -454,58 +484,183 @@ function guardar() {
   avisar("Pizarra guardada como PNG ✓");
 }
 
-/* ================= MOVER LA BARRA (móvil) ================= */
-/* Arrastrando el botón de puntos (⠿) la barra se mueve:
-   hacia abajo => horizontal en el fondo | hacia arriba => columna a la izquierda */
+/* ================= BARRA LIBRE EN PC / MÓVIL ================= */
 
-const barra = document.getElementById("toolbar");
-const barraHandle = document.getElementById("barra-handle");
+const estadoBarraPc = (() => {
+  try {
+    return JSON.parse(memoria.get("pizarra-barra-pc") || "") || { edge: "top", ratio: 0.5 };
+  } catch {
+    return { edge: "top", ratio: 0.5 };
+  }
+})();
 
-const memoria = {
-  get: k => { try { return localStorage.getItem(k); } catch { return null; } },
-  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }
-};
+let arrastreBarraMovil = null;
+let arrastreBarraPc = null;
+let modoBarraMovil = false;
 
-function estadoBarra(abajo) {
+function esMovil() {
+  return window.innerWidth <= 720 || (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+}
+
+function guardarBarraPc() {
+  memoria.set("pizarra-barra-pc", JSON.stringify(estadoBarraPc));
+}
+
+function estadoBarraMovil(abajo) {
   barra.classList.toggle("barra-abajo", abajo);
   memoria.set("pizarra-barra-abajo", abajo ? "1" : "0");
 }
 
-if (memoria.get("pizarra-barra-abajo") === "1") {
-  barra.classList.add("barra-abajo");
+function normalizarBarraPc() {
+  if (!["top", "bottom", "left", "right"].includes(estadoBarraPc.edge)) {
+    estadoBarraPc.edge = "top";
+  }
+  estadoBarraPc.ratio = clamp(Number(estadoBarraPc.ratio) || 0.5, 0, 1);
 }
 
-let arrastreBarra = null;
+function bordeMasCercano(x, y) {
+  const distancias = [
+    ["left", x],
+    ["right", window.innerWidth - x],
+    ["top", y],
+    ["bottom", window.innerHeight - y]
+  ];
+  distancias.sort((a, b) => a[1] - b[1]);
+  return distancias[0][0];
+}
+
+function aplicarBarraPc() {
+  normalizarBarraPc();
+  barra.classList.remove("modo-movil", "barra-abajo");
+  barra.classList.add("modo-pc", "posicion-libre");
+  barra.dataset.edge = estadoBarraPc.edge;
+  barra.dataset.layout = (estadoBarraPc.edge === "left" || estadoBarraPc.edge === "right") ? "vertical" : "horizontal";
+
+  barra.style.left = "16px";
+  barra.style.top = "16px";
+  barra.style.right = "auto";
+  barra.style.bottom = "auto";
+
+  const margen = 16;
+  const ancho = barra.offsetWidth;
+  const alto = barra.offsetHeight;
+
+  if (barra.dataset.layout === "horizontal") {
+    const usable = Math.max(0, window.innerWidth - ancho - margen * 2);
+    const left = Math.round(margen + usable * estadoBarraPc.ratio);
+    const top = estadoBarraPc.edge === "top"
+      ? margen
+      : Math.max(margen, window.innerHeight - alto - margen);
+    barra.style.left = `${left}px`;
+    barra.style.top = `${Math.round(top)}px`;
+  } else {
+    const usable = Math.max(0, window.innerHeight - alto - margen * 2);
+    const top = Math.round(margen + usable * estadoBarraPc.ratio);
+    const left = estadoBarraPc.edge === "left"
+      ? margen
+      : Math.max(margen, window.innerWidth - ancho - margen);
+    barra.style.left = `${Math.round(left)}px`;
+    barra.style.top = `${top}px`;
+  }
+}
+
+function aplicarBarraMovil() {
+  barra.classList.remove("modo-pc", "posicion-libre");
+  barra.classList.add("modo-movil");
+  barra.dataset.edge = barra.classList.contains("barra-abajo") ? "bottom" : "left";
+  barra.dataset.layout = barra.classList.contains("barra-abajo") ? "horizontal" : "vertical";
+  barra.style.left = "";
+  barra.style.top = "";
+  barra.style.right = "";
+  barra.style.bottom = "";
+}
+
+function aplicarBarra() {
+  modoBarraMovil = esMovil();
+  if (modoBarraMovil) {
+    estadoBarraMovil(memoria.get("pizarra-barra-abajo") === "1");
+    aplicarBarraMovil();
+  } else {
+    aplicarBarraPc();
+  }
+}
+
 barraHandle.addEventListener("pointerdown", e => {
   e.preventDefault();
-  arrastreBarra = { y: e.clientY };
+  if (modoBarraMovil) {
+    arrastreBarraMovil = { y: e.clientY, pointerId: e.pointerId };
+  } else {
+    arrastreBarraPc = { pointerId: e.pointerId };
+    barra.classList.add("arrastrando");
+  }
   barraHandle.setPointerCapture(e.pointerId);
 });
 
 barraHandle.addEventListener("pointermove", e => {
-  if (!arrastreBarra) return;
-  const dy = e.clientY - arrastreBarra.y;
-  if (!barra.classList.contains("barra-abajo") && dy > 45) {
-    estadoBarra(true);
-    arrastreBarra = null;
-  } else if (barra.classList.contains("barra-abajo") && dy < -45) {
-    estadoBarra(false);
-    arrastreBarra = null;
+  if (modoBarraMovil) {
+    if (!arrastreBarraMovil || arrastreBarraMovil.pointerId !== e.pointerId) return;
+    const dy = e.clientY - arrastreBarraMovil.y;
+    if (!barra.classList.contains("barra-abajo") && dy > 45) {
+      estadoBarraMovil(true);
+      aplicarBarraMovil();
+      arrastreBarraMovil = null;
+      avisar("Barra abajo");
+    } else if (barra.classList.contains("barra-abajo") && dy < -45) {
+      estadoBarraMovil(false);
+      aplicarBarraMovil();
+      arrastreBarraMovil = null;
+      avisar("Barra al costado");
+    }
+    return;
   }
+
+  if (!arrastreBarraPc || arrastreBarraPc.pointerId !== e.pointerId) return;
+  const edge = bordeMasCercano(e.clientX, e.clientY);
+  estadoBarraPc.edge = edge;
+  if (edge === "left" || edge === "right") {
+    estadoBarraPc.ratio = clamp((e.clientY - 16) / Math.max(1, window.innerHeight - 32), 0, 1);
+  } else {
+    estadoBarraPc.ratio = clamp((e.clientX - 16) / Math.max(1, window.innerWidth - 32), 0, 1);
+  }
+  aplicarBarraPc();
 });
 
-const finArrastreBarra = () => { arrastreBarra = null; };
-barraHandle.addEventListener("pointerup", finArrastreBarra);
-barraHandle.addEventListener("pointercancel", finArrastreBarra);
+function terminarArrastreBarra(e) {
+  if (arrastreBarraMovil && arrastreBarraMovil.pointerId === e.pointerId) {
+    arrastreBarraMovil = null;
+  }
+  if (arrastreBarraPc && arrastreBarraPc.pointerId === e.pointerId) {
+    arrastreBarraPc = null;
+    barra.classList.remove("arrastrando");
+    guardarBarraPc();
+  }
+}
 
-// primera vez: recordatorio
-if (TOQUE && memoria.get("pizarra-tip-barra") !== "1") {
-  memoria.set("pizarra-tip-barra", "1");
-  setTimeout(() => {
-    avisar("Tip: arrastrá el botón de puntos (⠿) para mover la barra");
-  }, 1500);
+barraHandle.addEventListener("pointerup", terminarArrastreBarra);
+barraHandle.addEventListener("pointercancel", terminarArrastreBarra);
+barraHandle.addEventListener("dblclick", () => {
+  if (modoBarraMovil) return;
+  estadoBarraPc.edge = "top";
+  estadoBarraPc.ratio = 0.5;
+  aplicarBarraPc();
+  guardarBarraPc();
+  avisar("Barra reubicada en su posición original");
+});
+
+if (TOQUE && memoria.get("pizarra-tip-barra-movil") !== "1") {
+  memoria.set("pizarra-tip-barra-movil", "1");
+  setTimeout(() => avisar("Tip: arrastrá el asa para llevar la barra al costado o abajo"), 1400);
+} else if (!TOQUE && memoria.get("pizarra-tip-barra-pc") !== "1") {
+  memoria.set("pizarra-tip-barra-pc", "1");
+  setTimeout(() => avisar("Tip: arrastrá el asa para mover la barra; doble clic la reinicia"), 1400);
 }
 
 /* ================= INICIO ================= */
 
+ajustarCanvas();
+aplicarBarra();
+window.addEventListener("resize", () => {
+  ajustarCanvas();
+  aplicarBarra();
+});
 setModo("mover");
