@@ -15,7 +15,7 @@ const fondo = new Image();
 const imgRojo = new Image();
 const imgAzul = new Image();
 
-fondo.src = "FONDO.jpeg";
+fondo.src = "fondo.jpg";
 imgRojo.src = "Kayapolored__1_-removebg-preview.png";
 imgAzul.src = "KayapoloRC__1_-removebg-preview.png";
 
