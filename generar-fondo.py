@@ -32,6 +32,12 @@ POSTE_ARCO_M = 0.08
 # Medidas reglamentarias del único arco que se dibuja sobre el campo.
 ARCO_ANCHO_M = 1.5
 ARCO_PROFUNDIDAD_M = 1.0
+# Paso de la malla del arco: da una cuadrícula densa dentro del rectángulo.
+ARCO_MALLA_PASO_M = 0.125
+
+# Franja de agua que queda por detrás de la línea de gol para que el arco
+# se apoye sobre agua y no sobre el marco verde.
+AGUA_DETRAS_ARCO_M = 1.5
 
 # Medidas de las líneas punteadas, expresadas en metros.
 LINEA_SEIS_METROS_M = 6
@@ -103,13 +109,32 @@ def linea_punteada_horizontal(im, y_m):
 
 
 def dibujar_arco_superior(im):
-    """Dibuja el único arco, centrado arriba, con su red de un metro de fondo."""
+    """Dibuja el único arco: un rectángulo de 1,5 m x 1 m con malla densa.
+
+    El arco queda centrado sobre la línea de gol superior, apoyado sobre la
+    franja de agua que hay detrás de esa línea, tal como en la referencia.
+    """
     lateral_izquierdo_m = (CAMPO_ANCHO_M - ARCO_ANCHO_M) / 2
     lateral_derecho_m = lateral_izquierdo_m + ARCO_ANCHO_M
     fondo_m = -ARCO_PROFUNDIDAD_M
 
-    # Los postes delimitan exactamente 1,5 m entre sus líneas centrales y
-    # se prolongan exactamente 1 m fuera de la línea de gol.
+    # Malla: cuadrícula densa de hilos verticales y horizontales que cubre
+    # todo el interior del rectángulo del arco (1,5 m x 1 m = 75 x 50 px).
+    hilo_m = 0.0
+    while hilo_m <= ARCO_ANCHO_M + 1e-9:
+        x_m = lateral_izquierdo_m + hilo_m
+        linea_campo(im, x_m, 0, x_m, fondo_m, RED, 0.02)
+        hilo_m += ARCO_MALLA_PASO_M
+
+    hilo_m = 0.0
+    while hilo_m <= ARCO_PROFUNDIDAD_M + 1e-9:
+        y_m = -hilo_m
+        linea_campo(im, lateral_izquierdo_m, y_m, lateral_derecho_m, y_m, RED, 0.02)
+        hilo_m += ARCO_MALLA_PASO_M
+
+    # Marco blanco del arco: los dos postes delimitan exactamente 1,5 m entre
+    # sus líneas centrales y se prolongan exactamente 1 m fuera de la línea de
+    # gol, donde los cierra el travesaño posterior.
     linea_campo(
         im, lateral_izquierdo_m, 0, lateral_izquierdo_m, fondo_m,
         BLANCO, POSTE_ARCO_M,
@@ -118,15 +143,10 @@ def dibujar_arco_superior(im):
         im, lateral_derecho_m, 0, lateral_derecho_m, fondo_m,
         BLANCO, POSTE_ARCO_M,
     )
-
-    # Travesaños de red dentro del arco. El borde inferior coincide con la
-    # única línea de gol y se dibuja una sola vez junto con el borde del campo.
-    for profundidad_m in (0.25, 0.5, 0.75):
-        linea_campo(
-            im, lateral_izquierdo_m, -profundidad_m,
-            lateral_derecho_m, -profundidad_m,
-            RED, LINEA_M / 2,
-        )
+    linea_campo(
+        im, lateral_izquierdo_m, fondo_m, lateral_derecho_m, fondo_m,
+        BLANCO, POSTE_ARCO_M,
+    )
 
 
 def generar():
@@ -138,6 +158,12 @@ def generar():
     # líneas de referencia, porque mide 23 × 35 metros a 50 píxeles por metro.
     rectangulo(im, campo_x1, campo_y1, campo_x2, campo_y2, AGUA)
 
+    # Agua detrás de la línea de gol: la pileta sigue más allá del campo
+    # jugable, así el arco se apoya sobre agua y no sobre el marco verde.
+    # No mueve la línea de gol ni cambia las medidas del campo.
+    _, agua_detras_y = punto_campo(0, -AGUA_DETRAS_ARCO_M)
+    rectangulo(im, campo_x1, agua_detras_y, campo_x2, campo_y1, AGUA)
+
     dibujar_arco_superior(im)
 
     # Línea de seis metros desde la única línea de gol superior y línea de
@@ -145,12 +171,21 @@ def generar():
     linea_punteada_horizontal(im, LINEA_SEIS_METROS_M)
     linea_punteada_horizontal(im, LINEA_MITAD_M)
 
-    # Borde exterior blanco. Su arista superior es la única línea de gol
-    # sólida; no se dibuja una segunda línea de gol ni otro arco abajo.
+    # Borde exterior blanco. La arista superior del campo jugable es la única
+    # línea de gol sólida; no se dibuja una segunda línea de gol ni otro arco
+    # abajo. Los laterales acompañan también al agua que queda detrás del arco.
     linea_campo(im, 0, 0, CAMPO_ANCHO_M, 0, BLANCO, BORDE_M)
     linea_campo(im, 0, CAMPO_LARGO_M, CAMPO_ANCHO_M, CAMPO_LARGO_M, BLANCO, BORDE_M)
-    linea_campo(im, 0, 0, 0, CAMPO_LARGO_M, BLANCO, BORDE_M)
-    linea_campo(im, CAMPO_ANCHO_M, 0, CAMPO_ANCHO_M, CAMPO_LARGO_M, BLANCO, BORDE_M)
+    linea_campo(im, 0, -AGUA_DETRAS_ARCO_M, 0, CAMPO_LARGO_M, BLANCO, BORDE_M)
+    linea_campo(
+        im, CAMPO_ANCHO_M, -AGUA_DETRAS_ARCO_M,
+        CAMPO_ANCHO_M, CAMPO_LARGO_M, BLANCO, BORDE_M,
+    )
+    # Cierre superior de la pileta, por detrás del arco.
+    linea_campo(
+        im, 0, -AGUA_DETRAS_ARCO_M, CAMPO_ANCHO_M, -AGUA_DETRAS_ARCO_M,
+        BLANCO, BORDE_M,
+    )
 
     return im
 

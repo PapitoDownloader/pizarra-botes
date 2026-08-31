@@ -26,9 +26,28 @@ function metrosAMundo(xMetros, yMetros) {
   };
 }
 
+/* Ajuste base del fondo: el PNG se encaja en la ventana y ese mismo encaje
+   (escala + origen) lo comparten el fondo, los botes, la pelota y los trazos.
+   Las coordenadas de mundo son siempre píxeles nativos del fondo. */
+let fondoAncho = FONDO_ANCHO_PX;
+let fondoAlto = FONDO_ALTO_PX;
+const base = { escala: 1, x: 0, y: 0 };
+
+function calcularBase() {
+  base.escala = Math.min(canvas.width / fondoAncho, canvas.height / fondoAlto);
+  base.x = (canvas.width - fondoAncho * base.escala) / 2;
+  base.y = (canvas.height - fondoAlto * base.escala) / 2;
+}
+
+// Escala final con la que se pinta todo: ajuste del fondo por el zoom actual.
+function escalaTotal() {
+  return base.escala * vista.zoom;
+}
+
 function ajustarCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+  calcularBase();
 }
 ajustarCanvas();
 window.addEventListener("resize", ajustarCanvas);
@@ -50,18 +69,26 @@ const punteros = new Map(); // punteros activos sobre el canvas
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-// de coordenadas de pantalla a coordenadas del campo
+// de coordenadas de pantalla a coordenadas del campo (mundo = píxeles del fondo).
+// Usa la misma escala base y el mismo origen con los que se dibuja el fondo,
+// para que todo siga siendo seleccionable y movible con cualquier zoom.
 function aMundo(sx, sy) {
-  return { x: (sx - vista.x) / vista.zoom, y: (sy - vista.y) / vista.zoom };
+  const escala = escalaTotal();
+  return {
+    x: (sx - (base.x * vista.zoom + vista.x)) / escala,
+    y: (sy - (base.y * vista.zoom + vista.y)) / escala
+  };
 }
 
 // zoom manteniendo fijo el punto (sx, sy)
 function zoomEn(sx, sy, factor) {
   const zoom = clamp(vista.zoom * factor, ZOOM_MIN, ZOOM_MAX);
-  const w = aMundo(sx, sy);
+  // punto de referencia en el espacio ya ajustado al fondo (zoom 1, sin pan)
+  const ux = (sx - vista.x) / vista.zoom;
+  const uy = (sy - vista.y) / vista.zoom;
   vista.zoom = zoom;
-  vista.x = sx - w.x * zoom;
-  vista.y = sy - w.y * zoom;
+  vista.x = sx - ux * zoom;
+  vista.y = sy - uy * zoom;
   vistaObjetivo = null;
 }
 
@@ -84,15 +111,15 @@ imgAzul.src = "KayapoloRC__1_-removebg-preview.png";
 const TAM = 70;
 const botes = [];
 
-// Formación inicial: todas las posiciones nacen en metros y quedan dentro del campo.
-const formacionRoja = [
-  [11.5, 3.0], [8.5, 5.2], [14.5, 5.2], [6.0, 8.0],
-  [17.0, 8.0], [9.0, 11.0], [14.0, 11.0], [11.5, 14.0]
-];
-const formacionAzul = [
-  [11.5, 32.0], [8.5, 29.8], [14.5, 29.8], [6.0, 27.0],
-  [17.0, 27.0], [9.0, 24.0], [14.0, 24.0], [11.5, 21.0]
-];
+// Formación inicial: los dos equipos ordenados sobre el costado izquierdo del
+// campo, en dos columnas. Todas las posiciones nacen en metros y quedan dentro
+// del campo (0..23 m de ancho, 0..35 m de largo).
+const COLUMNA_ROJA_X_M = 2.2;
+const COLUMNA_AZUL_X_M = 4.8;
+const FILAS_FORMACION_M = [5.0, 8.5, 12.0, 15.5, 19.0, 22.5, 26.0, 29.5];
+
+const formacionRoja = FILAS_FORMACION_M.map(y => [COLUMNA_ROJA_X_M, y]);
+const formacionAzul = FILAS_FORMACION_M.map(y => [COLUMNA_AZUL_X_M, y]);
 formacionRoja.forEach(([x, y]) => {
   const posicion = metrosAMundo(x, y);
   botes.push({ img: imgRojo, ...posicion, rot: 0, scale: 1 });
@@ -103,7 +130,7 @@ formacionAzul.forEach(([x, y]) => {
 });
 
 const centroCampo = metrosAMundo(CAMPO_ANCHO_M / 2, CAMPO_LARGO_M / 2);
-const pelota = { x: centroCampo.x, y: centroCampo.y, r: 8 };
+const pelota = { x: centroCampo.x, y: centroCampo.y, r: 10 };
 
 const trazos = [];
 let trazoActual = [];
@@ -180,18 +207,17 @@ window.addEventListener("keydown", e => {
 
 function dibujarFondo() {
   if (!fondo.complete || !fondo.width) return;
-  const r = Math.min(canvas.width / fondo.width, canvas.height / fondo.height);
-  const w = fondo.width * r;
-  const h = fondo.height * r;
-  ctx.drawImage(fondo, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+  // El fondo se dibuja en coordenadas de mundo: la escala de ajuste y el
+  // origen ya vienen aplicados en la transformación del lienzo.
+  ctx.drawImage(fondo, 0, 0, fondoAncho, fondoAlto);
 }
 
 function anillo(x, y, radio) {
   ctx.beginPath();
   ctx.arc(x, y, radio, 0, Math.PI * 2);
   ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
-  ctx.lineWidth = 2.5 / vista.zoom;
-  ctx.setLineDash([7 / vista.zoom, 6 / vista.zoom]);
+  ctx.lineWidth = 2.5 / escalaTotal();
+  ctx.setLineDash([7 / escalaTotal(), 6 / escalaTotal()]);
   ctx.stroke();
   ctx.setLineDash([]);
 }
@@ -215,7 +241,7 @@ function dibujarPelota() {
   ctx.arc(pelota.x, pelota.y, pelota.r, 0, Math.PI * 2);
   ctx.fillStyle = "white";
   ctx.fill();
-  ctx.lineWidth = 2 / vista.zoom;
+  ctx.lineWidth = 2 / escalaTotal();
   ctx.strokeStyle = "rgba(15, 23, 42, 0.75)";
   ctx.stroke();
 
@@ -224,7 +250,7 @@ function dibujarPelota() {
 
 function dibujarTrazos() {
   ctx.strokeStyle = "black";
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 3 / escalaTotal();
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   trazos.forEach(t => {
@@ -252,7 +278,14 @@ function loop() {
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.setTransform(vista.zoom, 0, 0, vista.zoom, vista.x, vista.y);
+  // Una sola transformación para todo: escala base del fondo × zoom, con el
+  // mismo origen horizontal y vertical y el mismo desplazamiento (pan).
+  const escala = escalaTotal();
+  ctx.setTransform(
+    escala, 0, 0, escala,
+    base.x * vista.zoom + vista.x,
+    base.y * vista.zoom + vista.y
+  );
   dibujarFondo();
   dibujarBotes();
   dibujarPelota();
@@ -269,6 +302,12 @@ const imagenLista = () => {
 [fondo, imgRojo, imgAzul].forEach(img => {
   img.addEventListener("load", imagenLista);
   img.addEventListener("error", imagenLista);
+});
+// El tamaño real del fondo define la escala base compartida por todo.
+fondo.addEventListener("load", () => {
+  fondoAncho = fondo.naturalWidth || FONDO_ANCHO_PX;
+  fondoAlto = fondo.naturalHeight || FONDO_ALTO_PX;
+  calcularBase();
 });
 
 /* ================= INTERACCIÓN (mouse / táctil / lápiz) ================= */
@@ -297,7 +336,9 @@ canvas.addEventListener("pointerdown", e => {
 
   const w = aMundo(mx, my);
   const toque = e.pointerType === "touch";
-  const margen = toque ? 14 : 4; // targets más generosos con el dedo
+  // targets más generosos con el dedo: el margen se expresa en píxeles de
+  // pantalla y se traduce a mundo con la misma escala compartida.
+  const margen = (toque ? 14 : 4) / escalaTotal();
 
   // pelota
   if (Math.hypot(w.x - pelota.x, w.y - pelota.y) < pelota.r + 6 + margen) {
@@ -360,7 +401,8 @@ canvas.addEventListener("pointermove", e => {
   }
 
   if (modo === "escalar" && seleccionado && seleccionado.scale !== undefined) {
-    seleccionado.scale = clamp(1 + (w.y - seleccionado.y) / 150, 0.3, 2);
+    const recorrido = (w.y - seleccionado.y) * escalaTotal();
+    seleccionado.scale = clamp(1 + recorrido / 150, 0.3, 2);
   }
 
   if (modo === "lapiz" && dibujando) {
