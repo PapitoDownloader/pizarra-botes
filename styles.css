@@ -83,6 +83,11 @@ canvas.cur-lapiz {
   to   { opacity: 1; transform: translate(-50%, 0); }
 }
 
+/* Asa para mover la barra (solo se ve en móvil) */
+.barra-handle {
+  display: none;
+}
+
 /* --- Marca --- */
 
 .brand {
@@ -362,6 +367,69 @@ button:focus-visible {
     padding: 10px 8px;
     border-radius: 20px;
     animation: entrar-izq 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: top 0.3s ease, left 0.3s ease, bottom 0.3s ease,
+      transform 0.3s ease, border-radius 0.3s ease;
+  }
+
+  /* Asa para mover la barra (visible solo en móvil) */
+  .barra-handle {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--glass-border);
+    color: var(--text-dim);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .barra-handle:active {
+    cursor: grabbing;
+    transform: scale(1.12);
+    color: var(--text);
+  }
+
+  .barra-handle svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  /* Barra movida hacia abajo: horizontal, tipo dock */
+  .topbar.barra-abajo {
+    top: auto;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: row;
+    padding: 8px 10px;
+  }
+
+  .topbar.barra-abajo .tools,
+  .topbar.barra-abajo .actions {
+    flex-direction: row;
+  }
+
+  .topbar.barra-abajo .topbar-divider {
+    display: none;
+  }
+
+  .topbar.barra-abajo .tool,
+  .topbar.barra-abajo .btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .topbar.barra-abajo .barra-handle svg {
+    transform: rotate(90deg);
+  }
+
+  /* Con la barra abajo, el estado pasa arriba */
+  .topbar.barra-abajo ~ .statusbar {
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    bottom: auto;
   }
 
   .brand,

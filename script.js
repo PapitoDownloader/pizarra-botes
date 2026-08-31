@@ -382,6 +382,58 @@ function guardar() {
   avisar("Pizarra guardada como PNG ✓");
 }
 
+/* ================= MOVER LA BARRA (móvil) ================= */
+/* Arrastrando el botón de puntos (⠿) la barra se mueve:
+   hacia abajo => horizontal en el fondo | hacia arriba => columna a la izquierda */
+
+const barra = document.getElementById("toolbar");
+const barraHandle = document.getElementById("barra-handle");
+
+const memoria = {
+  get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }
+};
+
+function estadoBarra(abajo) {
+  barra.classList.toggle("barra-abajo", abajo);
+  memoria.set("pizarra-barra-abajo", abajo ? "1" : "0");
+}
+
+if (memoria.get("pizarra-barra-abajo") === "1") {
+  barra.classList.add("barra-abajo");
+}
+
+let arrastreBarra = null;
+barraHandle.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  arrastreBarra = { y: e.clientY };
+  barraHandle.setPointerCapture(e.pointerId);
+});
+
+barraHandle.addEventListener("pointermove", e => {
+  if (!arrastreBarra) return;
+  const dy = e.clientY - arrastreBarra.y;
+  if (!barra.classList.contains("barra-abajo") && dy > 45) {
+    estadoBarra(true);
+    arrastreBarra = null;
+  } else if (barra.classList.contains("barra-abajo") && dy < -45) {
+    estadoBarra(false);
+    arrastreBarra = null;
+  }
+});
+
+const finArrastreBarra = () => { arrastreBarra = null; };
+barraHandle.addEventListener("pointerup", finArrastreBarra);
+barraHandle.addEventListener("pointercancel", finArrastreBarra);
+
+// primera vez: recordatorio
+if (TOQUE && memoria.get("pizarra-tip-barra") !== "1") {
+  memoria.set("pizarra-tip-barra", "1");
+  setTimeout(() => {
+    avisar("Tip: arrastrá el botón de puntos (⠿) para mover la barra");
+  }, 1500);
+}
+
 /* ================= INICIO ================= */
 
 setModo("mover");
