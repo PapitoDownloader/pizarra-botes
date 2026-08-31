@@ -12,12 +12,12 @@ const ctx = canvas.getContext("2d");
 // Geometría del fondo: 50 píxeles representan exactamente un metro.
 const ESCALA_PX_M = 50;
 const CAMPO_LARGO_M = 35;
-const CAMPO_ANCHO_M = 23;
+const CAMPO_ANCHO_M = 19;
 const FONDO_ANCHO_PX = 1178;
 const FONDO_ALTO_PX = 1928;
 const CAMPO_ORIGEN_X = (FONDO_ANCHO_PX - CAMPO_ANCHO_M * ESCALA_PX_M) / 2;
 const CAMPO_ORIGEN_Y = (FONDO_ALTO_PX - CAMPO_LARGO_M * ESCALA_PX_M) / 2;
-const ASSET_VERSION = "2026-08-31-02";
+const ASSET_VERSION = "2026-08-31-04";
 
 function assetUrl(path) {
   return `${path}?v=${ASSET_VERSION}`;
@@ -111,13 +111,13 @@ imgPelota.src = assetUrl("pelota.png");
 
 /* ================= OBJETOS ================= */
 
-const TAM_BOTE = 70;
+const TAM_BOTE = 78;
 const TAM_PELOTA = 30;
 const botes = [];
 
 // Formación inicial: los dos equipos ordenados sobre el costado izquierdo del
 // campo, en dos columnas. Todas las posiciones nacen en metros y quedan dentro
-// del campo (0..23 m de ancho, 0..35 m de largo).
+// del campo (0..19 m de ancho, 0..35 m de largo).
 const COLUMNA_ROJA_X_M = 2.2;
 const COLUMNA_AZUL_X_M = 4.8;
 const FILAS_FORMACION_M = [5.0, 8.5, 12.0, 15.5, 19.0, 22.5, 26.0, 29.5];

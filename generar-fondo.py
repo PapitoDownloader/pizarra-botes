@@ -11,7 +11,7 @@ import zlib
 
 ESCALA_PX_M = 50
 CAMPO_LARGO_M = 35
-CAMPO_ANCHO_M = 23
+CAMPO_ANCHO_M = 19
 ANCHO_PNG, ALTO_PNG = 1178, 1928
 
 # El campo queda centrado en el lienzo, con un margen que también se expresa
@@ -110,44 +110,38 @@ def linea_punteada_horizontal(im, y_m):
 
 
 def dibujar_arco_superior(im):
-    """Dibuja el único arco: un rectángulo de 1,5 m x 1 m con malla densa.
+    """Dibuja el único arco: un rectángulo de 2 m x 1 m centrado de forma exacta.
 
-    El arco queda centrado sobre la línea de gol superior, apoyado sobre la
-    franja de agua que hay detrás de esa línea, tal como en la referencia.
+    El marco y la malla se colocan tomando como referencia el centro en píxeles
+    del campo, para evitar el corrimiento visual de un lado respecto del otro.
     """
-    lateral_izquierdo_m = (CAMPO_ANCHO_M - ARCO_ANCHO_M) / 2
-    lateral_derecho_m = lateral_izquierdo_m + ARCO_ANCHO_M
-    fondo_m = -ARCO_PROFUNDIDAD_M
+    campo_x1, campo_y1 = punto_campo(0, 0)
+    campo_x2, _ = punto_campo(CAMPO_ANCHO_M, 0)
+    _, fondo_y = punto_campo(0, -ARCO_PROFUNDIDAD_M)
 
-    # Malla: cuadrícula densa de hilos verticales y horizontales que cubre
-    # todo el interior del rectángulo del arco (1,5 m x 1 m = 75 x 50 px).
-    hilo_m = 0.0
-    while hilo_m <= ARCO_ANCHO_M + 1e-9:
-        x_m = lateral_izquierdo_m + hilo_m
-        linea_campo(im, x_m, 0, x_m, fondo_m, RED, 0.02)
-        hilo_m += ARCO_MALLA_PASO_M
+    centro_x = (campo_x1 + campo_x2) // 2
+    ancho_libre_px = metros_a_px(ARCO_ANCHO_M)
+    profundidad_px = metros_a_px(ARCO_PROFUNDIDAD_M)
+    poste_px = max(3, metros_a_px(POSTE_ARCO_M))
+    paso_malla_px = max(4, int(ARCO_MALLA_PASO_M * ESCALA_PX_M + 0.5))
 
-    hilo_m = 0.0
-    while hilo_m <= ARCO_PROFUNDIDAD_M + 1e-9:
-        y_m = -hilo_m
-        linea_campo(im, lateral_izquierdo_m, y_m, lateral_derecho_m, y_m, RED, 0.02)
-        hilo_m += ARCO_MALLA_PASO_M
+    izquierda_interior = centro_x - ancho_libre_px // 2
+    derecha_interior = centro_x + ancho_libre_px // 2
+    izquierda_exterior = izquierda_interior - poste_px
+    derecha_exterior = derecha_interior + poste_px
+    techo_y = fondo_y
+    base_y = techo_y + profundidad_px
 
-    # Marco blanco del arco: los dos postes delimitan exactamente 1,5 m entre
-    # sus líneas centrales y se prolongan exactamente 1 m fuera de la línea de
-    # gol, donde los cierra el travesaño posterior.
-    linea_campo(
-        im, lateral_izquierdo_m, 0, lateral_izquierdo_m, fondo_m,
-        BLANCO, POSTE_ARCO_M,
-    )
-    linea_campo(
-        im, lateral_derecho_m, 0, lateral_derecho_m, fondo_m,
-        BLANCO, POSTE_ARCO_M,
-    )
-    linea_campo(
-        im, lateral_izquierdo_m, fondo_m, lateral_derecho_m, fondo_m,
-        BLANCO, POSTE_ARCO_M,
-    )
+    # Malla densa dentro del rectángulo completo del arco, bien centrada.
+    for x in range(izquierda_exterior + 1, derecha_exterior, paso_malla_px):
+        rectangulo(im, x, techo_y, x + 1, base_y, RED)
+    for y in range(techo_y + 1, base_y, paso_malla_px):
+        rectangulo(im, izquierda_exterior, y, derecha_exterior, y + 1, RED)
+
+    # Marco blanco, simétrico respecto del centro del campo.
+    rectangulo(im, izquierda_exterior, techo_y, izquierda_exterior + poste_px, campo_y1, BLANCO)
+    rectangulo(im, derecha_interior, techo_y, derecha_interior + poste_px, campo_y1, BLANCO)
+    rectangulo(im, izquierda_exterior, techo_y, derecha_exterior, techo_y + poste_px, BLANCO)
 
 
 def generar():
@@ -155,8 +149,8 @@ def generar():
 
     campo_x1, campo_y1 = punto_campo(0, 0)
     campo_x2, campo_y2 = punto_campo(CAMPO_ANCHO_M, CAMPO_LARGO_M)
-    # El rectángulo de agua tiene exactamente 1150 × 1750 píxeles entre sus
-    # líneas de referencia, porque mide 23 × 35 metros a 50 píxeles por metro.
+    # El rectángulo de agua tiene exactamente 950 × 1750 píxeles entre sus
+    # líneas de referencia, porque mide 19 × 35 metros a 50 píxeles por metro.
     rectangulo(im, campo_x1, campo_y1, campo_x2, campo_y2, AGUA)
 
     # Agua detrás de la línea de gol: la pileta sigue más allá del campo
