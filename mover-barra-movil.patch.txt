@@ -1,0 +1,210 @@
+--- a/index.html
++++ b/index.html
+@@ -19,6 +19,12 @@
+   <canvas id="canvas"></canvas>
+ 
+   <header class="topbar" id="toolbar">
++    <button class="barra-handle" id="barra-handle" aria-label="Mover la barra de herramientas">
++      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
++        <circle cx="9" cy="5" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="9" cy="19" r="1.4"/>
++        <circle cx="15" cy="5" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="15" cy="19" r="1.4"/>
++      </svg>
++    </button>
+     <div class="brand">
+       <div class="brand-icon" aria-hidden="true">
+         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+--- a/script.js
++++ b/script.js
+@@ -382,6 +382,58 @@
+   avisar("Pizarra guardada como PNG ✓");
+ }
+ 
++/* ================= MOVER LA BARRA (móvil) ================= */
++/* Arrastrando el botón de puntos (⠿) la barra se mueve:
++   hacia abajo => horizontal en el fondo | hacia arriba => columna a la izquierda */
++
++const barra = document.getElementById("toolbar");
++const barraHandle = document.getElementById("barra-handle");
++
++const memoria = {
++  get: k => { try { return localStorage.getItem(k); } catch { return null; } },
++  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }
++};
++
++function estadoBarra(abajo) {
++  barra.classList.toggle("barra-abajo", abajo);
++  memoria.set("pizarra-barra-abajo", abajo ? "1" : "0");
++}
++
++if (memoria.get("pizarra-barra-abajo") === "1") {
++  barra.classList.add("barra-abajo");
++}
++
++let arrastreBarra = null;
++barraHandle.addEventListener("pointerdown", e => {
++  e.preventDefault();
++  arrastreBarra = { y: e.clientY };
++  barraHandle.setPointerCapture(e.pointerId);
++});
++
++barraHandle.addEventListener("pointermove", e => {
++  if (!arrastreBarra) return;
++  const dy = e.clientY - arrastreBarra.y;
++  if (!barra.classList.contains("barra-abajo") && dy > 45) {
++    estadoBarra(true);
++    arrastreBarra = null;
++  } else if (barra.classList.contains("barra-abajo") && dy < -45) {
++    estadoBarra(false);
++    arrastreBarra = null;
++  }
++});
++
++const finArrastreBarra = () => { arrastreBarra = null; };
++barraHandle.addEventListener("pointerup", finArrastreBarra);
++barraHandle.addEventListener("pointercancel", finArrastreBarra);
++
++// primera vez: recordatorio
++if (TOQUE && memoria.get("pizarra-tip-barra") !== "1") {
++  memoria.set("pizarra-tip-barra", "1");
++  setTimeout(() => {
++    avisar("Tip: arrastrá el botón de puntos (⠿) para mover la barra");
++  }, 1500);
++}
++
+ /* ================= INICIO ================= */
+ 
+ setModo("mover");
+--- a/styles.css
++++ b/styles.css
+@@ -83,6 +83,11 @@
+   to   { opacity: 1; transform: translate(-50%, 0); }
+ }
+ 
++/* Asa para mover la barra (solo se ve en móvil) */
++.barra-handle {
++  display: none;
++}
++
+ /* --- Marca --- */
+ 
+ .brand {
+@@ -362,67 +367,8 @@
+     padding: 10px 8px;
+     border-radius: 20px;
+     animation: entrar-izq 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+-  }
+-
+-  /* Asa para mover la barra (visible solo en móvil) */
+-  .barra-handle {
+-    display: grid;
+-    place-items: center;
+-    width: 28px;
+-    height: 28px;
+-    padding: 0;
+-    border-radius: 50%;
+-    background: rgba(255, 255, 255, 0.08);
+-    border: 1px solid var(--glass-border);
+-    color: var(--text-dim);
+-    cursor: grab;
+-    touch-action: none;
+-  }
+-
+-  .barra-handle:active {
+-    cursor: grabbing;
+-    transform: scale(1.12);
+-    color: var(--text);
+-  }
+-
+-  .barra-handle svg {
+-    width: 15px;
+-    height: 15px;
+-  }
+-
+-  /* Barra movida hacia abajo: horizontal, tipo dock */
+-  .topbar.barra-abajo {
+-    top: auto;
+-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+-    left: 50%;
+-    transform: translateX(-50%);
+-    flex-direction: row;
+-    padding: 8px 10px;
+-  }
+-
+-  .topbar.barra-abajo .tools,
+-  .topbar.barra-abajo .actions {
+-    flex-direction: row;
+-  }
+-
+-  .topbar.barra-abajo .topbar-divider {
+-    display: none;
+-  }
+-
+-  .topbar.barra-abajo .tool,
+-  .topbar.barra-abajo .btn {
+-    width: 44px;
+-    height: 44px;
+-  }
+-
+-  .topbar.barra-abajo .barra-handle svg {
+-    transform: rotate(90deg);
+-  }
+-
+-  /* Con la barra abajo, el estado pasa arriba */
+-  .topbar.barra-abajo ~ .statusbar {
+-    top: calc(12px + env(safe-area-inset-top, 0px));
+-    bottom: auto;
++    transition: top 0.3s ease, left 0.3s ease, bottom 0.3s ease,
++      transform 0.3s ease, border-radius 0.3s ease;
+   }
+ 
+   /* Asa para mover la barra (visible solo en móvil) */
+@@ -565,6 +511,49 @@
+   }
+ }
+ 
++/* PC / notebook: versión compacta para que la barra
++   quepa en una sola fila (no tapa el arco ni el campo) */
++@media (max-width: 1200px) and (min-width: 721px) {
++  .topbar {
++    gap: 10px;
++    padding: 8px 12px;
++  }
++
++  .brand-icon {
++    width: 34px;
++    height: 34px;
++    border-radius: 10px;
++  }
++
++  .brand-icon svg {
++    width: 18px;
++    height: 18px;
++  }
++
++  .brand-name {
++    font-size: 14px;
++  }
++
++  .brand-sub {
++    display: none;
++  }
++
++  .tools {
++    gap: 3px;
++  }
++
++  .actions {
++    gap: 6px;
++  }
++
++  .tool,
++  .btn {
++    padding: 8px 12px;
++    gap: 7px;
++    font-size: 13px;
++  }
++}
++
+ @media (prefers-reduced-motion: reduce) {
+   .topbar,
+   .statusbar,
