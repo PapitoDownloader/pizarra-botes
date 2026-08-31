@@ -1,26 +1,358 @@
+/* =====================================================
+   Pizarra Táctica · Kayak Polo — Interfaz
+   Estilo: glassmorphism + acentos agua (cian/azul)
+   ===================================================== */
+
+:root {
+  --glass-bg: rgba(8, 15, 30, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.13);
+  --text: #eaf2ff;
+  --text-dim: rgba(234, 242, 255, 0.68);
+  --accent-a: #22d3ee;
+  --accent-b: #3b82f6;
+  --danger: #f87171;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
   overflow: hidden;
-  background: #444;
-  font-family: Arial, sans-serif;
+  background: #0b1c33;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   user-select: none;
-}
-
-#toolbar {
-  position: fixed;
-  top: 10px;
-  left: 10px;
-  z-index: 10;
-  background: rgba(220,220,220,0.95);
-  padding: 6px;
-  border-radius: 6px;
-}
-
-button {
-  margin: 2px;
+  -webkit-user-select: none;
 }
 
 canvas {
   display: block;
   cursor: grab;
+  touch-action: none;
+}
+
+canvas.cur-mover { cursor: grab; }
+canvas.cur-rotar { cursor: crosshair; }
+canvas.cur-escalar { cursor: ns-resize; }
+canvas.cur-lapiz {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'/></svg>") 2 21, crosshair;
+}
+
+/* ================= BARRA SUPERIOR ================= */
+
+.topbar {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  padding: 10px 14px;
+  max-width: calc(100vw - 24px);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  box-shadow:
+    0 20px 50px rgba(2, 8, 20, 0.45),
+    0 2px 8px rgba(2, 8, 20, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  animation: bajar 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes bajar {
+  from { opacity: 0; transform: translate(-50%, -14px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* --- Marca --- */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.brand-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(34, 211, 238, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.brand-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.brand-name {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: var(--text);
+}
+
+.brand-sub {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.8px;
+  color: var(--accent-a);
+}
+
+/* --- Herramientas --- */
+
+.tools {
+  display: flex;
+  gap: 4px;
+}
+
+.tool {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s, border-color 0.18s,
+    box-shadow 0.18s, transform 0.12s;
+}
+
+.tool svg {
+  width: 18px;
+  height: 18px;
+}
+
+.tool:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tool:active {
+  transform: scale(0.96);
+}
+
+.tool.is-active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6px 18px rgba(56, 132, 255, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* --- Separador --- */
+
+.topbar-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--glass-border);
+}
+
+/* --- Acciones --- */
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s, border-color 0.18s,
+    box-shadow 0.18s, transform 0.12s, filter 0.18s;
+}
+
+.btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.btn:active {
+  transform: scale(0.96);
+}
+
+.btn-ghost {
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--glass-border);
+}
+
+.btn-ghost:hover {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.btn-primary {
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 6px 18px rgba(34, 211, 238, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/* --- Tooltips --- */
+
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 9px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(4, 10, 22, 0.94);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 20;
+}
+
+[data-tip]:hover::after {
+  opacity: 1;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent-a);
+  outline-offset: 2px;
+}
+
+/* ================= BARRA DE ESTADO ================= */
+
+.statusbar {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px rgba(2, 8, 20, 0.35);
+  color: var(--text-dim);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  animation: subir 0.45s 0.08s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes subir {
+  from { opacity: 0; transform: translate(-50%, 14px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-a);
+  box-shadow: 0 0 10px var(--accent-a);
+  animation: pulso 2.2s infinite;
+}
+
+@keyframes pulso {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+.status-sep {
+  color: rgba(234, 242, 255, 0.3);
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 860px) {
+  .status-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 16px;
+  }
+
+  .brand-text,
+  .tool span,
+  .btn span {
+    display: none;
+  }
+
+  .brand {
+    padding-right: 0;
+  }
+
+  .tool,
+  .btn {
+    padding: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar,
+  .statusbar,
+  .status-dot {
+    animation: none;
+  }
 }
