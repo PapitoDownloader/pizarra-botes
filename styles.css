@@ -450,3 +450,45 @@ button:focus-visible {
     animation: none;
   }
 }
+/* PC / notebook: versión compacta para que la barra
+   quepa en una sola fila (no tapa el arco ni el campo) */
+@media (max-width: 1200px) and (min-width: 721px) {
+  .topbar {
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .brand-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .brand-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .brand-name {
+    font-size: 14px;
+  }
+
+  .brand-sub {
+    display: none;
+  }
+
+  .tools {
+    gap: 3px;
+  }
+
+  .actions {
+    gap: 6px;
+  }
+
+  .tool,
+  .btn {
+    padding: 8px 12px;
+    gap: 7px;
+    font-size: 13px;
+  }
+}
