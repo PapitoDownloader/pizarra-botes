@@ -9,6 +9,23 @@
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
+// Geometría del fondo: 50 píxeles representan exactamente un metro.
+const ESCALA_PX_M = 50;
+const CAMPO_LARGO_M = 35;
+const CAMPO_ANCHO_M = 23;
+const FONDO_ANCHO_PX = 1178;
+const FONDO_ALTO_PX = 1928;
+const CAMPO_ORIGEN_X = (FONDO_ANCHO_PX - CAMPO_ANCHO_M * ESCALA_PX_M) / 2;
+const CAMPO_ORIGEN_Y = (FONDO_ALTO_PX - CAMPO_LARGO_M * ESCALA_PX_M) / 2;
+
+// Convierte coordenadas tácticas (x: ancho, y: largo) a coordenadas de mundo.
+function metrosAMundo(xMetros, yMetros) {
+  return {
+    x: CAMPO_ORIGEN_X + xMetros * ESCALA_PX_M,
+    y: CAMPO_ORIGEN_Y + yMetros * ESCALA_PX_M
+  };
+}
+
 function ajustarCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -67,13 +84,26 @@ imgAzul.src = "KayapoloRC__1_-removebg-preview.png";
 const TAM = 70;
 const botes = [];
 
-// 8 rojos + 8 azules
-for (let i = 0; i < 8; i++) {
-  botes.push({ img: imgRojo, x: 100 + i * 80, y: 120, rot: 0, scale: 1 });
-  botes.push({ img: imgAzul, x: 100 + i * 80, y: 220, rot: 0, scale: 1 });
-}
+// Formación inicial: todas las posiciones nacen en metros y quedan dentro del campo.
+const formacionRoja = [
+  [11.5, 3.0], [8.5, 5.2], [14.5, 5.2], [6.0, 8.0],
+  [17.0, 8.0], [9.0, 11.0], [14.0, 11.0], [11.5, 14.0]
+];
+const formacionAzul = [
+  [11.5, 32.0], [8.5, 29.8], [14.5, 29.8], [6.0, 27.0],
+  [17.0, 27.0], [9.0, 24.0], [14.0, 24.0], [11.5, 21.0]
+];
+formacionRoja.forEach(([x, y]) => {
+  const posicion = metrosAMundo(x, y);
+  botes.push({ img: imgRojo, ...posicion, rot: 0, scale: 1 });
+});
+formacionAzul.forEach(([x, y]) => {
+  const posicion = metrosAMundo(x, y);
+  botes.push({ img: imgAzul, ...posicion, rot: Math.PI, scale: 1 });
+});
 
-const pelota = { x: canvas.width / 2, y: canvas.height / 2, r: 8 };
+const centroCampo = metrosAMundo(CAMPO_ANCHO_M / 2, CAMPO_LARGO_M / 2);
+const pelota = { x: centroCampo.x, y: centroCampo.y, r: 8 };
 
 const trazos = [];
 let trazoActual = [];
