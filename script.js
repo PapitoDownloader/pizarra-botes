@@ -12,7 +12,7 @@ const ctx = canvas.getContext("2d");
 // Geometría del fondo: 50 píxeles representan exactamente un metro.
 const ESCALA_PX_M = 50;
 const CAMPO_LARGO_M = 35;
-const CAMPO_ANCHO_M = 19;
+const CAMPO_ANCHO_M = 24;
 const FONDO_ANCHO_PX = 1178;
 const FONDO_ALTO_PX = 1928;
 const CAMPO_ORIGEN_X = (FONDO_ANCHO_PX - CAMPO_ANCHO_M * ESCALA_PX_M) / 2;
