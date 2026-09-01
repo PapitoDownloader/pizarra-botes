@@ -17,7 +17,7 @@ const FONDO_ANCHO_PX = 1178;
 const FONDO_ALTO_PX = 1928;
 const CAMPO_ORIGEN_X = (FONDO_ANCHO_PX - CAMPO_ANCHO_M * ESCALA_PX_M) / 2;
 const CAMPO_ORIGEN_Y = (FONDO_ALTO_PX - CAMPO_LARGO_M * ESCALA_PX_M) / 2;
-const ASSET_VERSION = "2026-08-31-04";
+const ASSET_VERSION = "2026-09-01-05";
 
 function assetUrl(path) {
   return `${path}?v=${ASSET_VERSION}`;
