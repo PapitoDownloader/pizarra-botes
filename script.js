@@ -111,9 +111,22 @@ imgPelota.src = assetUrl("pelota.png");
 
 /* ================= OBJETOS ================= */
 
-const TAM_BOTE = 78;
+// Los sprites de bote son kayaks largos (ancho ~0.73 m, largo ~3 m a 50 px/m).
+// Se dibujan respetando la proporción real del PNG para que no se vean
+// aplastados dentro de un cuadrado.
+const TAM_BOTE_LARGO = 150; // ~3 m a la escala actual (50 px = 1 m)
 const TAM_PELOTA = 30;
 const botes = [];
+
+// Devuelve el ancho/alto del sprite en píxeles de mundo manteniendo su aspecto.
+function dimensionesBote(b) {
+  const fuente = b.img;
+  const aspecto = fuente.width && fuente.height ? fuente.width / fuente.height : 0.24;
+  return {
+    w: TAM_BOTE_LARGO * aspecto,
+    h: TAM_BOTE_LARGO
+  };
+}
 
 // Formación inicial: los dos equipos ordenados sobre el costado izquierdo del
 // campo, en dos columnas. Todas las posiciones nacen en metros y quedan dentro
@@ -254,17 +267,34 @@ function anillo(x, y, radio) {
   ctx.setLineDash([]);
 }
 
+function anilloBote(b, dim) {
+  const rx = (dim.w / 2) * b.scale + 8;
+  const ry = (dim.h / 2) * b.scale + 8;
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(b.rot);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+  ctx.lineWidth = 2.5 / escalaTotal();
+  ctx.setLineDash([7 / escalaTotal(), 6 / escalaTotal()]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
 function dibujarBotes() {
   botes.forEach(b => {
     if (!b.img.complete || !b.img.width) return;
+    const dim = dimensionesBote(b);
     ctx.save();
     ctx.translate(b.x, b.y);
     ctx.rotate(b.rot);
     ctx.scale(b.scale, b.scale);
-    ctx.drawImage(b.img, -TAM_BOTE / 2, -TAM_BOTE / 2, TAM_BOTE, TAM_BOTE);
+    ctx.drawImage(b.img, -dim.w / 2, -dim.h / 2, dim.w, dim.h);
     ctx.restore();
 
-    if (b === seleccionado) anillo(b.x, b.y, (TAM_BOTE / 2) * b.scale + 8);
+    if (b === seleccionado) anilloBote(b, dim);
   });
 }
 
@@ -387,7 +417,9 @@ canvas.addEventListener("pointerdown", e => {
 
   for (let i = botes.length - 1; i >= 0; i--) {
     const b = botes[i];
-    if (Math.hypot(w.x - b.x, w.y - b.y) < (TAM_BOTE / 2) * b.scale + margen) {
+    const dim = dimensionesBote(b);
+    const radio = Math.max(dim.w, dim.h) / 2 * b.scale + margen;
+    if (Math.hypot(w.x - b.x, w.y - b.y) < radio) {
       seleccionado = b;
       offsetX = w.x - b.x;
       offsetY = w.y - b.y;
