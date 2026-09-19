@@ -17,7 +17,7 @@ const FONDO_ANCHO_PX = 1178;
 const FONDO_ALTO_PX = 1928;
 const CAMPO_ORIGEN_X = (FONDO_ANCHO_PX - CAMPO_ANCHO_M * ESCALA_PX_M) / 2;
 const CAMPO_ORIGEN_Y = (FONDO_ALTO_PX - CAMPO_LARGO_M * ESCALA_PX_M) / 2;
-const ASSET_VERSION = "2026-09-19-01";
+const ASSET_VERSION = "2026-09-19-02";
 
 function assetUrl(path) {
   return `${path}?v=${ASSET_VERSION}`;
@@ -109,6 +109,55 @@ imgRojo.src = assetUrl("bote-rojo.png");
 imgAzul.src = assetUrl("bote-azul.png");
 imgPelota.src = assetUrl("pelota.png");
 
+/* ================= MÁSCARAS ALFA (hitbox por píxel) ================= */
+
+/* La selección de botes y pelota coincide con los píxeles visibles del PNG:
+   un punto selecciona solo si el píxel del sprite que le cae debajo tiene
+   alfa > UMBRAL_ALFA. El canal alfa se lee UNA sola vez por imagen, en un
+   canvas auxiliar (nunca en el canvas principal), y queda guardado en un
+   WeakMap para no repetir getImageData en cada interacción. */
+const UMBRAL_ALFA = 8;
+const mascarasAlfa = new WeakMap();
+
+function leerMascaraAlfa(img) {
+  const ancho = img.naturalWidth;
+  const alto = img.naturalHeight;
+  const auxiliar = document.createElement("canvas");
+  auxiliar.width = ancho;
+  auxiliar.height = alto;
+  const c = auxiliar.getContext("2d", { willReadFrequently: true });
+  c.drawImage(img, 0, 0, ancho, alto);
+  const datos = c.getImageData(0, 0, ancho, alto).data;
+  const alfa = new Uint8Array(ancho * alto);
+  for (let i = 0, j = 3; i < alfa.length; i += 1, j += 4) alfa[i] = datos[j];
+  return { ancho, alto, alfa };
+}
+
+// Máscara alfa de una imagen ya cargada, o null si todavía no está disponible
+// (en ese caso el sprite tampoco se dibuja). Si el navegador impide leer los
+// píxeles (canvas contaminado, p. ej. al abrir el HTML con file://), la máscara
+// queda sin alfa y solo cuenta el rectángulo exacto donde se pinta el sprite.
+function mascaraAlfa(img) {
+  if (!img.complete || !img.naturalWidth || !img.naturalHeight) return null;
+  let mascara = mascarasAlfa.get(img);
+  if (mascara) return mascara;
+  try {
+    mascara = leerMascaraAlfa(img);
+  } catch {
+    mascara = { ancho: img.naturalWidth, alto: img.naturalHeight, alfa: null };
+  }
+  mascarasAlfa.set(img, mascara);
+  return mascara;
+}
+
+// ¿El píxel (px, py) del PNG es visible? Fuera de la imagen nunca lo es.
+function pixelVisible(mascara, px, py) {
+  if (!(px >= 0 && py >= 0 && px < mascara.ancho && py < mascara.alto)) return false;
+  if (!mascara.alfa) return true;
+  const indice = Math.floor(py) * mascara.ancho + Math.floor(px);
+  return mascara.alfa[indice] > UMBRAL_ALFA;
+}
+
 /* ================= OBJETOS ================= */
 
 // Los sprites de bote son kayaks largos (ancho ~0.73 m, largo ~3 m a 50 px/m).
@@ -128,20 +177,23 @@ function dimensionesBote(b) {
   };
 }
 
-// Hitbox del bote: el punto tiene que caer dentro de la elipse que ocupa el
-// sprite (respetando su rotación y escala), más un margen chico para el dedo.
-function puntoEnBote(w, b, margen) {
+// Hitbox del bote: el punto selecciona solo si cae sobre un píxel visible del
+// PNG, sin margen alguno. Se deshace la transformación con la que se dibuja el
+// sprite (traslación → rotación → escala) y el punto local se convierte a
+// píxeles del PNG con las mismas dimensiones que usa drawImage.
+function puntoEnBote(w, b) {
+  const mascara = mascaraAlfa(b.img);
+  if (!mascara || !(b.scale > 0)) return false;
   const dim = dimensionesBote(b);
-  const rx = (dim.w / 2) * b.scale + margen;
-  const ry = (dim.h / 2) * b.scale + margen;
-  if (rx <= 0 || ry <= 0) return false;
   const dx = w.x - b.x;
   const dy = w.y - b.y;
   const cos = Math.cos(b.rot);
   const sin = Math.sin(b.rot);
-  const localX = dx * cos + dy * sin;
-  const localY = -dx * sin + dy * cos;
-  return (localX * localX) / (rx * rx) + (localY * localY) / (ry * ry) <= 1;
+  const localX = (dx * cos + dy * sin) / b.scale;
+  const localY = (-dx * sin + dy * cos) / b.scale;
+  const px = ((localX + dim.w / 2) / dim.w) * mascara.ancho;
+  const py = ((localY + dim.h / 2) / dim.h) * mascara.alto;
+  return pixelVisible(mascara, px, py);
 }
 
 // Formación inicial: los dos equipos ordenados sobre el costado izquierdo del
@@ -164,6 +216,23 @@ formacionAzul.forEach(([x, y]) => {
 
 const centroCampo = metrosAMundo(CAMPO_ANCHO_M / 2, CAMPO_LARGO_M / 2);
 const pelota = { x: centroCampo.x, y: centroCampo.y, r: 11 };
+
+// Hitbox de la pelota: los píxeles visibles de su PNG (que trae padding
+// transparente alrededor). Si la imagen no cargó o falló, vale el círculo de
+// respaldo que realmente se dibuja: radio pelota.r más la mitad de su borde
+// (lineWidth de 2 px de pantalla centrado en el contorno → sobresale 1 px).
+function puntoEnPelota(w) {
+  const dx = w.x - pelota.x;
+  const dy = w.y - pelota.y;
+  const mascara = mascaraAlfa(imgPelota);
+  if (mascara) {
+    const px = ((dx + TAM_PELOTA / 2) / TAM_PELOTA) * mascara.ancho;
+    const py = ((dy + TAM_PELOTA / 2) / TAM_PELOTA) * mascara.alto;
+    return pixelVisible(mascara, px, py);
+  }
+  const radio = pelota.r + 1 / escalaTotal();
+  return Math.hypot(dx, dy) <= radio;
+}
 
 const trazos = [];
 let trazoActual = [];
@@ -397,6 +466,12 @@ fondo.addEventListener("load", () => {
   calcularBase();
 });
 
+// Las máscaras alfa se calculan apenas carga cada sprite, así el primer toque
+// no paga el costo de getImageData (después quedan en el WeakMap).
+[imgRojo, imgAzul, imgPelota].forEach(img => {
+  img.addEventListener("load", () => mascaraAlfa(img));
+});
+
 /* ================= INTERACCIÓN (mouse / táctil / lápiz) ================= */
 
 canvas.addEventListener("pointerdown", e => {
@@ -421,12 +496,10 @@ canvas.addEventListener("pointerdown", e => {
   if (punteros.size > 2) return;
 
   const w = aMundo(mx, my);
-  const toque = e.pointerType === "touch";
-  const margen = (toque ? 6 : 2) / escalaTotal();
 
-  // Hitbox de la pelota: solo su círculo visible, sin zona extra alrededor.
-  const radioPelota = (imgPelota.complete && imgPelota.width ? TAM_PELOTA / 2 : pelota.r) + margen;
-  if (Math.hypot(w.x - pelota.x, w.y - pelota.y) <= radioPelota) {
+  // Sin márgenes de selección para ningún tipo de puntero (mouse, lápiz o
+  // touch): solo cuentan los píxeles visibles de cada sprite.
+  if (puntoEnPelota(w)) {
     seleccionado = pelota;
     offsetX = w.x - pelota.x;
     offsetY = w.y - pelota.y;
@@ -435,7 +508,7 @@ canvas.addEventListener("pointerdown", e => {
 
   for (let i = botes.length - 1; i >= 0; i--) {
     const b = botes[i];
-    if (puntoEnBote(w, b, margen)) {
+    if (puntoEnBote(w, b)) {
       seleccionado = b;
       offsetX = w.x - b.x;
       offsetY = w.y - b.y;
