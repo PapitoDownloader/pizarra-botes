@@ -17,7 +17,7 @@ const FONDO_ANCHO_PX = 1178;
 const FONDO_ALTO_PX = 1928;
 const CAMPO_ORIGEN_X = (FONDO_ANCHO_PX - CAMPO_ANCHO_M * ESCALA_PX_M) / 2;
 const CAMPO_ORIGEN_Y = (FONDO_ALTO_PX - CAMPO_LARGO_M * ESCALA_PX_M) / 2;
-const ASSET_VERSION = "2026-09-01-05";
+const ASSET_VERSION = "2026-09-19-01";
 
 function assetUrl(path) {
   return `${path}?v=${ASSET_VERSION}`;
@@ -126,6 +126,22 @@ function dimensionesBote(b) {
     w: TAM_BOTE_LARGO * aspecto,
     h: TAM_BOTE_LARGO
   };
+}
+
+// Hitbox del bote: el punto tiene que caer dentro de la elipse que ocupa el
+// sprite (respetando su rotación y escala), más un margen chico para el dedo.
+function puntoEnBote(w, b, margen) {
+  const dim = dimensionesBote(b);
+  const rx = (dim.w / 2) * b.scale + margen;
+  const ry = (dim.h / 2) * b.scale + margen;
+  if (rx <= 0 || ry <= 0) return false;
+  const dx = w.x - b.x;
+  const dy = w.y - b.y;
+  const cos = Math.cos(b.rot);
+  const sin = Math.sin(b.rot);
+  const localX = dx * cos + dy * sin;
+  const localY = -dx * sin + dy * cos;
+  return (localX * localX) / (rx * rx) + (localY * localY) / (ry * ry) <= 1;
 }
 
 // Formación inicial: los dos equipos ordenados sobre el costado izquierdo del
@@ -406,9 +422,11 @@ canvas.addEventListener("pointerdown", e => {
 
   const w = aMundo(mx, my);
   const toque = e.pointerType === "touch";
-  const margen = (toque ? 14 : 4) / escalaTotal();
+  const margen = (toque ? 6 : 2) / escalaTotal();
 
-  if (Math.hypot(w.x - pelota.x, w.y - pelota.y) < pelota.r + 6 + margen) {
+  // Hitbox de la pelota: solo su círculo visible, sin zona extra alrededor.
+  const radioPelota = (imgPelota.complete && imgPelota.width ? TAM_PELOTA / 2 : pelota.r) + margen;
+  if (Math.hypot(w.x - pelota.x, w.y - pelota.y) <= radioPelota) {
     seleccionado = pelota;
     offsetX = w.x - pelota.x;
     offsetY = w.y - pelota.y;
@@ -417,9 +435,7 @@ canvas.addEventListener("pointerdown", e => {
 
   for (let i = botes.length - 1; i >= 0; i--) {
     const b = botes[i];
-    const dim = dimensionesBote(b);
-    const radio = Math.max(dim.w, dim.h) / 2 * b.scale + margen;
-    if (Math.hypot(w.x - b.x, w.y - b.y) < radio) {
+    if (puntoEnBote(w, b, margen)) {
       seleccionado = b;
       offsetX = w.x - b.x;
       offsetY = w.y - b.y;
