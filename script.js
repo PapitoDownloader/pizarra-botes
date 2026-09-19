@@ -17,7 +17,7 @@ const FONDO_ANCHO_PX = 1178;
 const FONDO_ALTO_PX = 1928;
 const CAMPO_ORIGEN_X = (FONDO_ANCHO_PX - CAMPO_ANCHO_M * ESCALA_PX_M) / 2;
 const CAMPO_ORIGEN_Y = (FONDO_ALTO_PX - CAMPO_LARGO_M * ESCALA_PX_M) / 2;
-const ASSET_VERSION = "2026-09-19-04";
+const ASSET_VERSION = "2026-09-19-05";
 
 function assetUrl(path) {
   return `${path}?v=${ASSET_VERSION}`;
@@ -160,10 +160,11 @@ function pixelVisible(mascara, px, py) {
 
 /* ================= OBJETOS ================= */
 
-// Los sprites de bote son kayaks largos (ancho ~0.58 m, largo ~2.4 m a 50 px/m).
+// Los sprites de bote son kayaks largos (ancho ~0.46 m, largo ~1.9 m a 50 px/m;
+// ancho = largo x aspecto del PNG, ~1.9 m x 0.24).
 // Se dibujan respetando la proporción real del PNG para que no se vean
 // aplastados dentro de un cuadrado.
-const TAM_BOTE_LARGO = 120; // ~2.4 m a la escala actual (50 px = 1 m): 20% menos que los 150 px anteriores (~3 m)
+const TAM_BOTE_LARGO = 96; // ~1.9 m a la escala actual (50 px = 1 m): 36% menos que los 150 px originales (~3 m) y 20% menos que los 120 px anteriores
 const TAM_PELOTA = 30;
 const botes = [];
 
